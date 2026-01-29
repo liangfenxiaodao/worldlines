@@ -173,21 +173,29 @@ The daily digest branch runs on a schedule (typically end of day). It queries th
 
 ---
 
-## 6. Technology Considerations
+## 6. Technology Choice
 
-This document intentionally does not prescribe a specific database technology. The storage design is compatible with:
+### 6.1 Database: SQLite
+The MVP uses **SQLite** as the storage backend.
 
-- **Relational databases** (PostgreSQL, SQLite) for structured queries and ACID guarantees
-- **Document stores** (MongoDB) for flexible schema evolution
-- **Hybrid approaches** using relational storage for items/analyses and a search engine for full-text queries
+**Rationale:**
+- Single-user system — no concurrent write contention
+- Single-file database — trivial to back up, migrate, and inspect
+- No external database service required — reduces cost and operational complexity
+- Deployed on Fly.io with a persistent volume, so the database file survives restarts and deploys
+- If the system outgrows SQLite, migration to PostgreSQL is straightforward (standard SQL schemas, no SQLite-specific features)
 
-Technology selection will be made during MVP implementation based on scale requirements, deployment constraints, and operational complexity preferences.
+**SQLite-specific considerations:**
+- JSON fields (dimensions, key_entities, exposures) are stored as TEXT containing JSON, queried via SQLite's `json_each()` and `json_extract()` functions
+- UUIDs are stored as TEXT (SQLite has no native UUID type)
+- Timestamps are stored as TEXT in ISO 8601 format
+- WAL mode should be enabled for better read concurrency during digest generation
 
-### 6.1 Minimum Requirements
-Any chosen storage solution must support:
+### 6.2 Migration Path
+If SQLite becomes insufficient (e.g., multi-user access, high write volume), migrate to PostgreSQL:
 
-- UUID-based primary keys
-- Timestamp-based range queries
-- Array field querying (for dimensions, key_entities)
-- Transactional writes (at minimum, per-record atomicity)
-- Data export for backup and migration
+1. Export SQLite data via `.dump` or a migration script
+2. Adjust JSON column handling (PostgreSQL has native `JSONB`)
+3. Adjust UUID handling (PostgreSQL has native `UUID` type)
+4. Update `DATABASE_URL` configuration
+5. No schema redesign required — the table structures are standard SQL

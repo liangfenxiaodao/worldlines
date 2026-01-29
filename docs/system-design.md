@@ -374,17 +374,22 @@ The human user reflects, contextualizes, and decides.
 
 ## 11. Deployment Model
 
-### 11.1 Cloud-Managed Deployment
-Worldlines runs as a cloud-managed service, deployed early in the development lifecycle to enable continuous use from the start.
+### 11.1 Platform: Fly.io
+Worldlines is deployed to **Fly.io** (free tier), chosen for persistent volume support (required for SQLite) and simple container-based deployment.
 
-### 11.2 Containerization
-The application is packaged as a Docker container for consistent deployment across environments.
+### 11.2 Tech Stack
+- **Backend:** Python
+- **Database:** SQLite on a Fly.io persistent volume
+- **Frontend:** Node.js (post-MVP, not needed initially)
 
-### 11.3 Scheduling
-Ingestion and digest generation run on a schedule (e.g., cron or cloud scheduler). The system does not require a persistent server process between runs.
+### 11.3 Containerization
+The application is packaged as a Docker container. A `Dockerfile` and `fly.toml` define the build and deployment configuration.
 
-### 11.4 Secrets Management
-All credentials (LLM API keys, Telegram bot token, database credentials) are stored in the cloud provider's secret manager or injected via environment variables. No secrets in source code or container images.
+### 11.4 Scheduling
+Ingestion and digest generation run on a cron schedule inside the container. The system runs as a long-lived process (not serverless) to support cron and persistent SQLite access.
+
+### 11.5 Secrets Management
+Secrets are managed via `fly secrets set`. The SQLite database path is configured in `fly.toml` to point to the persistent volume. See `docs/configuration.md` for the full variable reference.
 
 ---
 

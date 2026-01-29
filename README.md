@@ -50,7 +50,9 @@ It is a tool for understanding, not forecasting.
 
 ## MVP
 
-Ingest from RSS feeds, classify via LLM, deliver a daily Telegram digest — deployed to the cloud and running unattended.
+Ingest from RSS feeds, classify via LLM, deliver a daily Telegram digest — deployed to Fly.io and running unattended.
+
+**Stack:** Python · SQLite · Fly.io · Anthropic Claude API
 
 ## Documentation
 

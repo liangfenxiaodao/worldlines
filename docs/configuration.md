@@ -20,7 +20,7 @@ These must be set for the system to function.
 
 | Variable | Description | Example |
 |---|---|---|
-| `DATABASE_URL` | Connection string for the database | `postgresql://user:pass@host:5432/worldlines` |
+| `DATABASE_PATH` | Path to the SQLite database file | `/data/worldlines.db` |
 
 ### 2.2 LLM / AI Layer
 
@@ -116,7 +116,7 @@ See `docs/source-adapters.md` for full adapter configuration details.
 ### 5.1 What Counts as a Secret
 The following variables contain sensitive values and must be managed through the cloud provider's secret manager:
 
-- `DATABASE_URL` (contains credentials)
+- `DATABASE_PATH` (not a secret per se, but platform-specific)
 - `LLM_API_KEY`
 - `TELEGRAM_BOT_TOKEN`
 
@@ -125,19 +125,23 @@ For local development, use a `.env` file:
 
 ```
 # .env (DO NOT COMMIT)
-DATABASE_URL=sqlite:///./worldlines.db
+DATABASE_PATH=./worldlines.db
 LLM_API_KEY=sk-...
 LLM_MODEL=claude-sonnet-4-20250514
 TELEGRAM_BOT_TOKEN=123456:ABC-DEF...
 TELEGRAM_CHAT_ID=-1001234567890
 ```
 
-### 5.3 Production
-In production, secrets are injected via the cloud provider's mechanism:
-- AWS: Secrets Manager or SSM Parameter Store
-- GCP: Secret Manager
-- Fly.io: `fly secrets set`
-- Railway: Environment variables in dashboard
+### 5.3 Production (Fly.io)
+In production, secrets are set via the Fly.io CLI:
+
+```
+fly secrets set LLM_API_KEY=sk-...
+fly secrets set TELEGRAM_BOT_TOKEN=123456:ABC-DEF...
+fly secrets set TELEGRAM_CHAT_ID=-1001234567890
+```
+
+`DATABASE_PATH` is set in `fly.toml` to point to the persistent volume (e.g., `/data/worldlines.db`).
 
 ---
 
@@ -146,8 +150,8 @@ In production, secrets are injected via the cloud provider's mechanism:
 The repository should include this file at the root:
 
 ```
-# Database
-DATABASE_URL=
+# Database (SQLite file path)
+DATABASE_PATH=./worldlines.db
 
 # LLM
 LLM_API_KEY=

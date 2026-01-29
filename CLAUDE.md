@@ -61,16 +61,23 @@ When analyzing information, always aim to:
 - Indicate the likely time horizon (short / medium / long)
 - Produce a neutral, factual summary
 
+## Tech Stack
+- **Backend:** Python
+- **Frontend:** Node.js (post-MVP, not needed for MVP)
+- **Database:** SQLite (single file, persistent volume)
+- **Deployment:** Fly.io (free tier, persistent disk for SQLite)
+- **LLM:** Anthropic Claude API
+
 ## MVP Scope
 The MVP delivers a working end-to-end system:
-**Ingest → Analyze → Telegram Daily Digest**, deployed to the cloud and running unattended.
+**Ingest → Analyze → Telegram Daily Digest**, deployed to Fly.io and running unattended.
 
 MVP includes:
-- One source adapter (ingestion)
+- One source adapter (RSS feeds)
 - Normalization and deduplication
 - AI classification (dimensions, change type, time horizon, summary, importance)
 - Daily Telegram digest as the primary output
-- Cloud deployment with secrets management
+- Fly.io deployment with secrets via `fly secrets set`
 
 Post-MVP (iterate after shipping):
 - Structural exposure mapping
