@@ -1,0 +1,20 @@
+{
+  "adapters": [
+    {
+      "type": "rss",
+      "enabled": true,
+      "feeds": [
+        {
+          "url": "https://feeds.arstechnica.com/arstechnica/index",
+          "source_name": "Ars Technica",
+          "source_type": "news"
+        },
+        {
+          "url": "https://www.theverge.com/rss/index.xml",
+          "source_name": "The Verge",
+          "source_type": "news"
+        }
+      ]
+    }
+  ]
+}

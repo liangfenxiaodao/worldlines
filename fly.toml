@@ -1,0 +1,14 @@
+app = "worldlines"
+primary_region = "sjc"
+
+[env]
+  DATABASE_PATH = "/data/worldlines.db"
+  SOURCES_CONFIG_PATH = "/app/config/sources.json"
+
+[mounts]
+  source = "worldlines_data"
+  destination = "/data"
+
+[[vm]]
+  size = "shared-cpu-1x"
+  memory = "256mb"
