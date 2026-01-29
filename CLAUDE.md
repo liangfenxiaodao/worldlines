@@ -1,7 +1,6 @@
-# Claude.md
+# Worldlines
 
-## Project Context
-This project is a **long-term trend intelligence system** designed for 5+ year investment research.
+Worldlines is a **long-term trend intelligence system** designed for long term investment research.
 
 It is NOT:
 - A trading signal system
