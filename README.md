@@ -47,3 +47,19 @@ This system is intended to be used:
 - As a thinking aid, not a decision replacement
 
 It is a tool for understanding, not forecasting.
+
+## MVP
+
+Ingest from RSS feeds, classify via LLM, deliver a daily Telegram digest — deployed to the cloud and running unattended.
+
+## Documentation
+
+| Document | Description |
+|---|---|
+| [System Design](docs/system-design.md) | High-level architecture, dimensions, lifecycle, deployment model |
+| [Data Schemas](docs/schemas.md) | JSON schemas for all data structures |
+| [Storage Design](docs/storage-design.md) | Storage architecture, temporal linking, re-analysis support |
+| [API Contracts](docs/api-contracts.md) | Inter-component contracts and query interfaces |
+| [AI Prompt Spec](docs/ai-prompt-spec.md) | Prompt templates, classification guidelines, validation rules |
+| [Source Adapters](docs/source-adapters.md) | Adapter interface, RSS adapter spec, future adapters |
+| [Configuration](docs/configuration.md) | All environment variables, defaults, and secrets management |
