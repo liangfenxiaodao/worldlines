@@ -324,7 +324,101 @@ A **Deduplication Record** tracks when items are merged during the deduplication
 
 ---
 
-## 5. Enumeration Reference
+## 5. Daily Digest Record
+
+A **Daily Digest Record** captures the content of a Telegram daily digest sent to the user. It serves as a log of what was communicated and supports historical review.
+
+### Schema
+
+```json
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "title": "DailyDigestRecord",
+  "type": "object",
+  "required": ["id", "digest_date", "item_count", "dimension_breakdown", "high_importance_items", "change_type_distribution", "sent_at"],
+  "properties": {
+    "id": {
+      "type": "string",
+      "format": "uuid",
+      "description": "Unique identifier for this digest."
+    },
+    "digest_date": {
+      "type": "string",
+      "format": "date",
+      "description": "The date this digest covers (YYYY-MM-DD)."
+    },
+    "item_count": {
+      "type": "integer",
+      "minimum": 0,
+      "description": "Total number of items ingested and analyzed for this digest period."
+    },
+    "dimension_breakdown": {
+      "type": "object",
+      "properties": {
+        "compute_and_computational_paradigms": { "type": "integer" },
+        "capital_flows_and_business_models": { "type": "integer" },
+        "energy_resources_and_physical_constraints": { "type": "integer" },
+        "technology_adoption_and_industrial_diffusion": { "type": "integer" },
+        "governance_regulation_and_societal_response": { "type": "integer" }
+      },
+      "description": "Count of items per structural dimension (items may span multiple dimensions)."
+    },
+    "change_type_distribution": {
+      "type": "object",
+      "properties": {
+        "reinforcing": { "type": "integer" },
+        "friction": { "type": "integer" },
+        "early_signal": { "type": "integer" },
+        "neutral": { "type": "integer" }
+      },
+      "description": "Count of items per change type."
+    },
+    "high_importance_items": {
+      "type": "array",
+      "items": {
+        "type": "object",
+        "required": ["item_id", "analysis_id", "title", "summary", "dimensions", "change_type"],
+        "properties": {
+          "item_id": { "type": "string", "format": "uuid" },
+          "analysis_id": { "type": "string", "format": "uuid" },
+          "title": { "type": "string" },
+          "summary": { "type": "string" },
+          "dimensions": {
+            "type": "array",
+            "items": { "type": "string" }
+          },
+          "change_type": { "type": "string" }
+        }
+      },
+      "description": "Items with importance medium or high, included with their summaries."
+    },
+    "message_text": {
+      "type": "string",
+      "description": "The rendered message text as sent to Telegram."
+    },
+    "sent_at": {
+      "type": "string",
+      "format": "date-time",
+      "description": "Timestamp when the digest was sent (ISO 8601)."
+    },
+    "telegram_message_ids": {
+      "type": "array",
+      "items": { "type": "string" },
+      "description": "Telegram message IDs returned after sending. Supports multi-message digests."
+    }
+  }
+}
+```
+
+### Notes
+
+- `high_importance_items` includes items with `importance` of `medium` or `high` to surface the most structurally relevant signals.
+- `message_text` preserves exactly what was sent, enabling review without re-rendering.
+- `telegram_message_ids` is an array because long digests may be split across multiple Telegram messages.
+
+---
+
+## 6. Enumeration Reference
 
 For clarity, the canonical enum values used across all schemas:
 
@@ -343,14 +437,16 @@ For clarity, the canonical enum values used across all schemas:
 
 ---
 
-## 6. Entity Relationships
+## 7. Entity Relationships
 
 ```
 NormalizedItem (1) ──→ (many) AnalyticalOutput
 AnalyticalOutput (1) ──→ (0..1) StructuralExposureRecord
+AnalyticalOutput (many) ──→ (1) DailyDigestRecord (via high_importance_items)
 NormalizedItem (many) ──→ (1) DeduplicationRecord (via canonical_item_id)
 ```
 
 - A NormalizedItem may be re-analyzed multiple times (producing multiple AnalyticalOutputs with different `analysis_version` values).
 - A StructuralExposureRecord is only created for AnalyticalOutputs with `importance` of `medium` or `high`.
+- A DailyDigestRecord references AnalyticalOutputs included in that day's digest.
 - DeduplicationRecords preserve the lineage of merged items.

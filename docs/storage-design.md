@@ -69,7 +69,17 @@ Contains all `StructuralExposureRecord` records.
 - Query by `exposure_type` or `exposure_strength` for filtered views
 - Query by `dimensions_implicated` for dimension-level exposure aggregation
 
-### 2.4 Deduplication Store
+### 2.4 Digest Store
+Contains all `DailyDigestRecord` records.
+
+**Purpose:** Log of all digests sent via Telegram. Enables historical review and prevents duplicate sends.
+
+**Key access patterns:**
+- Insert new digest records after sending
+- Query by `digest_date` to check if a digest has already been sent for a given day
+- Query by date range for historical review
+
+### 2.5 Deduplication Store
 Contains all `DeduplicationRecord` records.
 
 **Purpose:** Preserves lineage of merged items.
@@ -148,14 +158,18 @@ Source → Ingest → Normalize → Deduplicate → Store (Items Store)
                                                 ↓
                                           Store (Analysis Store)
                                                 ↓
-                                    [if importance ≥ medium]
-                                                ↓
-                                          Map Exposure
-                                                ↓
-                                          Store (Exposure Store)
+                              ┌──────────────────┴──────────────────┐
+                              ↓                                     ↓
+                    [if importance ≥ medium]              Generate Daily Digest
+                              ↓                                     ↓
+                        Map Exposure                     Send via Telegram
+                              ↓                                     ↓
+                    Store (Exposure Store)              Store (Digest Store)
 ```
 
 At each stage, the system only moves forward. No stage mutates data produced by a prior stage.
+
+The daily digest branch runs on a schedule (typically end of day). It queries the Analysis Store for items analyzed since the last digest, aggregates them, and sends via Telegram.
 
 ---
 

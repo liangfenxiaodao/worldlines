@@ -340,43 +340,75 @@ Past items may be re-analyzed with updated frameworks.
 
 ## 10. Output & Review Surfaces
 
-### 10.1 Event-Level Outputs
-Selective notifications may be generated for high-relevance items.
+### 10.1 Telegram Daily Digest (MVP Primary Output)
+The primary output surface is a **daily Telegram digest** delivered to a configured chat.
 
-### 10.2 Periodic Summaries
+The digest includes:
+- Number of items ingested and analyzed
+- Breakdown by structural dimension
+- High-importance items with neutral summaries
+- Change type distribution (reinforcing / friction / early signal / neutral)
+
+Design constraints:
+- Messages follow Telegram's formatting and 4096-character limit
+- Long digests are split across multiple messages
+- Days with no new items produce a brief acknowledgment, not silence
+- Bot token and chat ID are managed as secrets
+
+### 10.2 Event-Level Notifications
+Selective immediate notifications may be sent via Telegram for items classified as `importance: high`. This is optional and secondary to the daily digest.
+
+### 10.3 Periodic Summaries (Post-MVP)
 Regular summaries surface:
 - Signal density
 - Emerging constraints
 - Persistent themes
 
-### 10.3 Trend Observation
+### 10.4 Trend Observation
 Trends are observed, not forecasted.
 
-### 10.4 Human Role
+### 10.5 Human Role
 The human user reflects, contextualizes, and decides.
 
 ---
 
-## 11. Evolution Path
+## 11. Deployment Model
 
-### 11.1 Phase 1: Observation & Classification
-Current phase.
+### 11.1 Cloud-Managed Deployment
+Worldlines runs as a cloud-managed service, deployed early in the development lifecycle to enable continuous use from the start.
 
-Focus on accurate categorization and low-noise ingestion.
+### 11.2 Containerization
+The application is packaged as a Docker container for consistent deployment across environments.
 
-### 11.2 Phase 2: Signal Aggregation
-Future phase.
+### 11.3 Scheduling
+Ingestion and digest generation run on a schedule (e.g., cron or cloud scheduler). The system does not require a persistent server process between runs.
 
-Patterns and densities become visible.
-
-### 11.3 Phase 3: Hypothesis Tracking
-Optional future phase.
-
-Explicit hypotheses may be tracked, but never forced.
+### 11.4 Secrets Management
+All credentials (LLM API keys, Telegram bot token, database credentials) are stored in the cloud provider's secret manager or injected via environment variables. No secrets in source code or container images.
 
 ---
 
-## 12. Non-Goals & Trade-offs
+## 12. Evolution Path
+
+### 12.1 MVP: Ingest → Analyze → Telegram Digest
+Current phase.
+
+A single source adapter ingests information, the AI layer classifies it, and a daily Telegram digest is delivered. Deployed to cloud and running unattended.
+
+### 12.2 Phase 2: Exposure Mapping & Additional Sources
+Structural exposure mapping is added. Additional source adapters broaden coverage.
+
+### 12.3 Phase 3: Signal Aggregation & Query Interface
+Patterns and densities become visible. A review surface (CLI or web) enables browsing and filtering.
+
+### 12.4 Phase 4: Temporal Linking & Hypothesis Tracking
+Optional future phase.
+
+Temporal links connect signals across time. Explicit hypotheses may be tracked, but never forced.
+
+---
+
+## 13. Non-Goals & Trade-offs
 
 ### 12.1 No Forecasting
 Prediction is intentionally excluded.
@@ -392,7 +424,7 @@ Bias, missing data, and interpretive uncertainty are accepted realities.
 
 ---
 
-## 13. Open Questions & Future Considerations
+## 14. Open Questions & Future Considerations
 
 - How should conflicting signals be represented?
 - How should diminishing relevance be handled?

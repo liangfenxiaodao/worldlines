@@ -61,15 +61,29 @@ When analyzing information, always aim to:
 - Indicate the likely time horizon (short / medium / long)
 - Produce a neutral, factual summary
 
-## Development Guidance
-At this stage:
-- DO NOT generate production code unless explicitly requested
-- Focus on documentation, system design, schemas, workflows, and reasoning frameworks
-- Assume MVP implementation will happen later
+## MVP Scope
+The MVP delivers a working end-to-end system:
+**Ingest → Analyze → Telegram Daily Digest**, deployed to the cloud and running unattended.
 
-If code is requested in the future:
-- Follow the documented system design strictly
-- Do not introduce features or assumptions not discussed
+MVP includes:
+- One source adapter (ingestion)
+- Normalization and deduplication
+- AI classification (dimensions, change type, time horizon, summary, importance)
+- Daily Telegram digest as the primary output
+- Cloud deployment with secrets management
+
+Post-MVP (iterate after shipping):
+- Structural exposure mapping
+- Additional source adapters
+- Query interfaces and review surfaces
+- Temporal linking and re-analysis
+- CI/CD, monitoring, periodic summaries
+
+## Development Guidance
+- Follow the documented system design, schemas, and API contracts strictly
+- Do not introduce features or assumptions not discussed in the docs
+- Prioritize shipping MVP over completeness
+- Deploy early and iterate
 
 ## Tone & Style
 - Analytical

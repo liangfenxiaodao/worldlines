@@ -6,10 +6,12 @@ This document defines the contracts between Worldlines system components. Each c
 
 ## 1. Overview
 
-The system consists of four pipeline stages, each with a defined contract:
+The system consists of a core pipeline and output channels:
 
 ```
-[Ingestion] → [Normalization & Dedup] → [AI Analysis] → [Exposure Mapping]
+[Ingestion] → [Normalization & Dedup] → [AI Analysis] → [Exposure Mapping (post-MVP)]
+                                                ↓
+                                    [Daily Digest Generation] → [Telegram Delivery]
 ```
 
 Additionally, there are query contracts for retrieving stored data.
@@ -186,7 +188,52 @@ The mapping layer must NOT:
 
 ---
 
-## 6. Query Contracts
+## 6. Daily Digest & Telegram Delivery Contract
+
+### 6.1 Purpose
+Generates a daily digest from the day's analyzed items and delivers it via Telegram. This is the **primary MVP output surface**.
+
+### 6.2 Input: Digest Generation Request
+
+```json
+{
+  "digest_date": "YYYY-MM-DD",
+  "since": "ISO 8601 datetime — start of the digest window (typically previous digest time)"
+}
+```
+
+### 6.3 Internal Processing
+1. Query the Analysis Store for all AnalyticalOutputs with `analyzed_at` within the digest window
+2. Aggregate by dimension and change type
+3. Select items with `importance` of `medium` or `high` for inclusion with summaries
+4. Render the digest into Telegram-formatted message text (MarkdownV2 or HTML)
+5. Split into multiple messages if content exceeds 4096 characters
+
+### 6.4 Output: Telegram Delivery Result
+
+```json
+{
+  "digest_record": "DailyDigestRecord (as defined in schemas.md)",
+  "delivery_status": "string — enum: sent | empty_day | failed",
+  "error": "string | null — present if delivery_status is 'failed'"
+}
+```
+
+- `empty_day`: No items were analyzed during the digest window. A brief acknowledgment is sent instead.
+- `failed`: Telegram API call failed. The digest record is still persisted for retry.
+
+### 6.5 Telegram API Constraints
+- Bot token and chat ID are injected via environment variables
+- Messages use Telegram Bot API `sendMessage` endpoint
+- Rate limits: Telegram allows ~30 messages per second to the same chat; not a practical constraint for daily digests
+- On API failure, retry with exponential backoff (max 3 attempts)
+
+### 6.6 Optional: High-Importance Immediate Notification
+Items classified as `importance: high` may optionally trigger an immediate Telegram notification outside the daily digest cycle. This is a post-MVP enhancement.
+
+---
+
+## 7. Query Contracts
 
 ### 6.1 Item Query
 
@@ -295,7 +342,7 @@ The mapping layer must NOT:
 
 ---
 
-## 7. Cross-Cutting Concerns
+## 8. Cross-Cutting Concerns
 
 ### 7.1 Idempotency
 - Ingestion and normalization are idempotent (dedup prevents double-processing)

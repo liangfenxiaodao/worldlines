@@ -1,0 +1,17 @@
+{
+  "permissions": {
+    "allow": [
+      "Bash(gh repo view:*)",
+      "Bash(brew list:*)",
+      "Bash(brew install:*)",
+      "Bash(gh auth status:*)",
+      "Bash(gh label create:*)",
+      "Bash(gh issue create:*)",
+      "Bash(gh issue edit:*)",
+      "Bash(gh api:*)",
+      "Bash(for i in 1 2 3 4 5 6 7 8 9 20 22 23 25)",
+      "Bash(do gh issue edit $i --milestone \"MVP\" --repo liangfenxiaodao/worldlines)",
+      "Bash(done)"
+    ]
+  }
+}
