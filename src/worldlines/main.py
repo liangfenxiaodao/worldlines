@@ -8,6 +8,7 @@ import signal
 import sys
 
 from worldlines.config import load_config
+from worldlines.storage import init_db
 
 logger = logging.getLogger("worldlines")
 
@@ -60,7 +61,7 @@ def main() -> None:
         config.llm_model,
     )
 
-    # TODO: Initialize database
+    init_db(config.database_path)
     # TODO: Create scheduler
     # TODO: Register ingestion and digest jobs
     # TODO: Start scheduler
