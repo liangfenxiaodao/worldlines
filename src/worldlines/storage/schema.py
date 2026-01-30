@@ -15,8 +15,9 @@ CREATE TABLE IF NOT EXISTS items (
     title           TEXT NOT NULL,
     source_name     TEXT NOT NULL,
     source_type     TEXT NOT NULL CHECK (source_type IN (
-                        'news', 'filing', 'report', 'research',
-                        'government', 'industry', 'other'
+                        'news', 'filing', 'transcript', 'report',
+                        'research', 'government', 'policy', 'industry',
+                        'other'
                     )),
     timestamp       TEXT NOT NULL,
     content         TEXT NOT NULL,

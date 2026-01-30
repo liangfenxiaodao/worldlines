@@ -28,7 +28,7 @@ Accepts raw information from heterogeneous sources and produces a uniform raw in
 ```json
 {
   "source_name": "string (required)",
-  "source_type": "string (required) — enum: news | filing | report | research | government | industry | other",
+  "source_type": "string (required) — enum: news | filing | transcript | report | research | government | policy | industry | other",
   "title": "string (required)",
   "content": "string (required)",
   "url": "string | null",

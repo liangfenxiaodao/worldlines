@@ -177,6 +177,11 @@ The item suggests a potential new structural trajectory that has not yet establi
 - Preliminary evidence of a paradigm shift
 - Small-scale evidence that contradicts prevailing assumptions
 
+Sector-level or category-level reporting is often a source of early signals.
+Such items may indicate emerging patterns across multiple actors, but typically
+require corroboration from primary disclosures or operational data before
+supporting high-importance classification.
+
 **Caution:** Early signals require the highest scrutiny. The bar is: "If this scales, it would change the trajectory of this dimension." Not: "This is interesting."
 
 ### 4.4 Neutral (`neutral`)
@@ -245,6 +250,16 @@ When uncertain, prefer the longer horizon. Worldlines is designed for long-term 
 ## 7. Importance Calibration
 
 Importance reflects **structural relevance to long-term trajectories**, not urgency, market impact, or news value.
+
+### 7.0 Note on Evidence and Source Context
+
+Source type may be considered as supporting context when calibrating importance,
+particularly when an item reflects primary disclosures (e.g. financial filings
+or earnings transcripts).
+
+However, importance must always be justified by **structural impact**, not by
+the source type alone. A filing that does not introduce new structural information
+should remain low or medium importance.
 
 ### 7.1 High (`high`)
 Reserved for items that materially change the understanding of a structural trajectory.

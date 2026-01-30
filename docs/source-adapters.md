@@ -26,6 +26,27 @@ SourceAdapter:
   configure(config) → void       # Accept adapter-specific configuration
 ```
 
+> Note on `source_type`:
+>
+> `source_type` is a **semantic metadata field**, not a control signal.
+> It provides contextual information to downstream analysis layers, but **must not**
+> alter adapter behavior, ingestion order, or pipeline routing.
+>
+> All source types — including news, filings, transcripts, and reports — enter the
+> same ingestion and analysis pipeline.
+
+Canonical `source_type` values are descriptive, not exhaustive.
+Typical values include (but are not limited to):
+
+- `news`        — general or sector-level reporting
+- `filing`      — regulatory or financial disclosures (e.g. 10-K, 10-Q)
+- `transcript`  — earnings calls or formal statements
+- `report`      — institutional or research publications
+- `policy`      — government or regulatory announcements
+- `other`       — manual or uncategorized inputs
+
+
+
 ### 2.2 Output: RawSourceItem
 
 Each adapter emits items in the `RawSourceItem` format defined in `docs/api-contracts.md` section 2.2:
@@ -44,7 +65,9 @@ Each adapter emits items in the `RawSourceItem` format defined in `docs/api-cont
 ### 2.3 Behavioral Requirements
 
 - **Idempotent fetching:** Adapters must track what has already been fetched (via timestamps, cursors, or seen-URL sets) to avoid emitting the same item repeatedly. The deduplication layer is a safety net, not a substitute for adapter-level tracking.
-- **No filtering:** Adapters fetch and emit. They do not classify, rank, or discard items based on relevance. Relevance assessment happens downstream in the AI analysis layer.
+- **No filtering:** Adapters fetch and emit items uniformly across all source types
+  (news, filings, transcripts, reports, etc.). They do not classify, rank, or discard
+  items based on relevance, importance, or perceived evidentiary weight.
 - **No transformation beyond normalization:** Adapters parse source-specific formats into `RawSourceItem`. They do not summarize, translate, or enrich content.
 - **Graceful failure:** If a source is unavailable, the adapter logs the failure and returns an empty result. It does not crash the pipeline or block other adapters.
 - **Rate limit compliance:** Adapters must respect the source's rate limits and terms of service.
@@ -130,6 +153,12 @@ The RSS adapter uses a combination of:
 - Per-feed set of seen URLs (to handle feeds that don't update timestamps reliably)
 
 ### 5.5 Suggested Initial Feeds
+
+Financial disclosures (e.g. earnings, filings, transcripts) and sector-level
+industry reporting are treated as **first-class information sources**, alongside
+general news feeds. Their structural significance is assessed downstream during
+analysis, not at ingestion time.
+
 Structural signals relevant to Worldlines' five dimensions can be sourced from:
 
 - **Compute:** Semiconductor industry publications, cloud provider blogs
@@ -139,6 +168,8 @@ Structural signals relevant to Worldlines' five dimensions can be sourced from:
 - **Governance:** Government gazette feeds, regulatory body announcements
 
 Specific feed URLs will be configured at deployment time.
+
+Financial disclosures (earnings, filings) and sector-level reporting are treated as first-class sources alongside news feeds.
 
 ---
 

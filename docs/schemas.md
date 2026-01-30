@@ -37,7 +37,7 @@ A **Normalized Item** is the canonical internal representation of any ingested i
         },
         "type": {
           "type": "string",
-          "enum": ["news", "filing", "report", "research", "government", "industry", "other"],
+          "enum": ["news", "filing", "transcript", "report", "research", "government", "policy", "industry", "other"],
           "description": "Category of origin."
         }
       },
@@ -424,7 +424,7 @@ For clarity, the canonical enum values used across all schemas:
 
 | Field | Values |
 |---|---|
-| `source.type` | `news`, `filing`, `report`, `research`, `government`, `industry`, `other` |
+| `source.type` | `news`, `filing`, `transcript`, `report`, `research`, `government`, `policy`, `industry`, `other` |
 | `dimension` | `compute_and_computational_paradigms`, `capital_flows_and_business_models`, `energy_resources_and_physical_constraints`, `technology_adoption_and_industrial_diffusion`, `governance_regulation_and_societal_response` |
 | `change_type` | `reinforcing`, `friction`, `early_signal`, `neutral` |
 | `time_horizon` | `short_term`, `medium_term`, `long_term` |
