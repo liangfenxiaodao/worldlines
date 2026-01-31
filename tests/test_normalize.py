@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+import json
 import uuid
 
 import pytest
@@ -9,7 +10,9 @@ import pytest
 from worldlines.ingestion.dedup import compute_dedup_hash
 from worldlines.ingestion.normalize import (
     NormalizedItem,
+    NormalizationResult,
     RawSourceItem,
+    ingest_item,
     normalize,
     persist_item,
     _validate_raw_item,
@@ -209,3 +212,96 @@ class TestPersistItem:
         with get_connection(db_path) as conn:
             count = conn.execute("SELECT COUNT(*) FROM items").fetchone()[0]
         assert count == 2
+
+
+# --- Ingest (normalize + deduplicate) ---
+
+
+class TestIngestItem:
+    def test_new_item_returns_status_new(self, db_path):
+        result = ingest_item(_make_raw(), db_path)
+        assert result.status == "new"
+        assert result.duplicate_of is None
+
+    def test_new_item_is_persisted(self, db_path):
+        result = ingest_item(_make_raw(), db_path)
+
+        with get_connection(db_path) as conn:
+            row = conn.execute("SELECT id FROM items WHERE id = ?", (result.item.id,)).fetchone()
+        assert row is not None
+
+    def test_new_item_returns_normalized_item(self, db_path):
+        result = ingest_item(_make_raw(title="My Article"), db_path)
+        assert isinstance(result.item, NormalizedItem)
+        assert result.item.title == "My Article"
+
+    def test_duplicate_returns_status_duplicate(self, db_path):
+        ingest_item(_make_raw(), db_path)
+        result = ingest_item(_make_raw(), db_path)
+        assert result.status == "duplicate"
+
+    def test_duplicate_returns_canonical_id(self, db_path):
+        first = ingest_item(_make_raw(), db_path)
+        second = ingest_item(_make_raw(), db_path)
+        assert second.duplicate_of == first.item.id
+
+    def test_duplicate_is_not_persisted_to_items(self, db_path):
+        ingest_item(_make_raw(), db_path)
+        second = ingest_item(_make_raw(), db_path)
+
+        with get_connection(db_path) as conn:
+            row = conn.execute("SELECT id FROM items WHERE id = ?", (second.item.id,)).fetchone()
+        assert row is None
+
+    def test_duplicate_creates_dedup_record(self, db_path):
+        first = ingest_item(_make_raw(), db_path)
+        second = ingest_item(_make_raw(), db_path)
+
+        with get_connection(db_path) as conn:
+            row = conn.execute(
+                "SELECT * FROM deduplication_records WHERE canonical_item_id = ?",
+                (first.item.id,),
+            ).fetchone()
+        assert row is not None
+        assert json.loads(row["duplicate_item_ids"]) == [second.item.id]
+        assert row["method"] == "hash_exact"
+
+    def test_dedup_record_has_timestamp(self, db_path):
+        from datetime import datetime
+
+        first = ingest_item(_make_raw(), db_path)
+        ingest_item(_make_raw(), db_path)
+
+        with get_connection(db_path) as conn:
+            row = conn.execute(
+                "SELECT deduped_at FROM deduplication_records WHERE canonical_item_id = ?",
+                (first.item.id,),
+            ).fetchone()
+        # Should parse without error
+        datetime.fromisoformat(row["deduped_at"])
+
+    def test_multiple_duplicates_create_separate_records(self, db_path):
+        first = ingest_item(_make_raw(), db_path)
+        ingest_item(_make_raw(), db_path)
+        ingest_item(_make_raw(), db_path)
+
+        with get_connection(db_path) as conn:
+            rows = conn.execute(
+                "SELECT * FROM deduplication_records WHERE canonical_item_id = ?",
+                (first.item.id,),
+            ).fetchall()
+        assert len(rows) == 2
+
+    def test_different_items_both_ingested(self, db_path):
+        a = ingest_item(_make_raw(title="Article A"), db_path)
+        b = ingest_item(_make_raw(title="Article B"), db_path)
+        assert a.status == "new"
+        assert b.status == "new"
+
+        with get_connection(db_path) as conn:
+            count = conn.execute("SELECT COUNT(*) FROM items").fetchone()[0]
+        assert count == 2
+
+    def test_invalid_item_raises(self, db_path):
+        with pytest.raises(ValueError, match="Invalid RawSourceItem"):
+            ingest_item(_make_raw(title=""), db_path)

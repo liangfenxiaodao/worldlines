@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+import json
 import logging
 import uuid
 from dataclasses import dataclass
@@ -97,6 +98,15 @@ def normalize(raw: RawSourceItem) -> NormalizedItem:
     )
 
 
+@dataclass(frozen=True)
+class NormalizationResult:
+    """Result of the normalize-and-deduplicate pipeline."""
+
+    status: str  # "new" or "duplicate"
+    item: NormalizedItem
+    duplicate_of: str | None = None  # canonical item ID if duplicate
+
+
 def persist_item(item: NormalizedItem, database_path: str) -> None:
     """Insert a NormalizedItem into the Items Store."""
     with get_connection(database_path) as conn:
@@ -118,3 +128,61 @@ def persist_item(item: NormalizedItem, database_path: str) -> None:
             ),
         )
     logger.info("Persisted item %s (%s)", item.id, item.title)
+
+
+def ingest_item(raw: RawSourceItem, database_path: str) -> NormalizationResult:
+    """Normalize a raw item and deduplicate against the Items Store.
+
+    1. Normalize the raw item (validate, generate UUID, compute dedup hash).
+    2. Check the Items Store for an existing item with the same dedup_hash.
+    3. If duplicate: record a DeduplicationRecord and return status "duplicate".
+    4. If new: persist the item and return status "new".
+    """
+    item = normalize(raw)
+
+    with get_connection(database_path) as conn:
+        existing = conn.execute(
+            "SELECT id FROM items WHERE dedup_hash = ?",
+            (item.dedup_hash,),
+        ).fetchone()
+
+        if existing is not None:
+            canonical_id = existing["id"]
+            conn.execute(
+                "INSERT INTO deduplication_records "
+                "(canonical_item_id, duplicate_item_ids, deduped_at, method) "
+                "VALUES (?, ?, ?, ?)",
+                (
+                    canonical_id,
+                    json.dumps([item.id]),
+                    datetime.now(timezone.utc).isoformat(),
+                    "hash_exact",
+                ),
+            )
+            logger.info(
+                "Duplicate detected: %s is duplicate of %s", item.id, canonical_id
+            )
+            return NormalizationResult(
+                status="duplicate", item=item, duplicate_of=canonical_id
+            )
+
+        conn.execute(
+            "INSERT INTO items "
+            "(id, title, source_name, source_type, timestamp, content, "
+            "canonical_link, ingested_at, dedup_hash) "
+            "VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)",
+            (
+                item.id,
+                item.title,
+                item.source_name,
+                item.source_type,
+                item.timestamp,
+                item.content,
+                item.canonical_link,
+                item.ingested_at,
+                item.dedup_hash,
+            ),
+        )
+
+    logger.info("Ingested new item %s (%s)", item.id, item.title)
+    return NormalizationResult(status="new", item=item)
