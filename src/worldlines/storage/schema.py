@@ -77,6 +77,15 @@ CREATE TABLE IF NOT EXISTS digests (
     telegram_message_ids        TEXT NOT NULL   -- JSON array
 );
 
+-- Adapter state for tracking fetch position
+CREATE TABLE IF NOT EXISTS adapter_state (
+    adapter_name    TEXT NOT NULL,
+    feed_url        TEXT NOT NULL,
+    state_data      TEXT NOT NULL,          -- JSON object
+    updated_at      TEXT NOT NULL,
+    PRIMARY KEY (adapter_name, feed_url)
+);
+
 -- Temporal links between items
 CREATE TABLE IF NOT EXISTS temporal_links (
     id              TEXT PRIMARY KEY,
