@@ -5,14 +5,39 @@
       "enabled": true,
       "feeds": [
         {
-          "url": "https://feeds.arstechnica.com/arstechnica/index",
+          "url": "https://semiengineering.com/feed/",
+          "source_name": "Semiconductor Engineering",
+          "source_type": "industry"
+        },
+        {
+          "url": "https://www.theregister.com/headlines.atom",
+          "source_name": "The Register",
+          "source_type": "news"
+        },
+        {
+          "url": "https://feeds.arstechnica.com/arstechnica/technology-lab",
           "source_name": "Ars Technica",
           "source_type": "news"
         },
         {
-          "url": "https://www.theverge.com/rss/index.xml",
-          "source_name": "The Verge",
+          "url": "https://www.utilitydive.com/feeds/news/",
+          "source_name": "Utility Dive",
+          "source_type": "industry"
+        },
+        {
+          "url": "https://www.eia.gov/rss/todayinenergy.xml",
+          "source_name": "EIA Today in Energy",
+          "source_type": "government"
+        },
+        {
+          "url": "https://techcrunch.com/feed/",
+          "source_name": "TechCrunch",
           "source_type": "news"
+        },
+        {
+          "url": "https://www.technologyreview.com/feed/",
+          "source_name": "MIT Technology Review",
+          "source_type": "research"
         }
       ]
     }
