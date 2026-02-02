@@ -181,6 +181,25 @@ fly secrets set TELEGRAM_CHAT_ID=-1001234567890
 fly deploy
 ```
 
+## Web Frontend (Planned)
+
+A read-only web interface for browsing historical digests and classified items.
+
+**Architecture:** FastAPI API + React SPA, served as a second process in the same Fly.io app. Both processes share the SQLite database volume — the worker writes, the web process reads.
+
+| Component | Stack |
+|-----------|-------|
+| API | FastAPI, Pydantic, SQLite (read-only) |
+| Frontend | React, Vite, TypeScript |
+| Deployment | Dual-process on Fly.io (worker + web) |
+
+**Pages:**
+- **Dashboard** — System stats, dimension/change-type breakdown, link to latest digest
+- **Digests** — Paginated list of daily digests with detail view
+- **Items** — Filterable, paginated items with full analysis detail
+
+See [Web Frontend Design](docs/web-frontend-design.md) for the full technical design.
+
 ## Documentation
 
 | Document | Description |
@@ -192,3 +211,4 @@ fly deploy
 | [AI Prompt Spec](docs/ai-prompt-spec.md) | Prompt templates, classification guidelines, validation rules |
 | [Source Adapters](docs/source-adapters.md) | Adapter interface, RSS adapter spec, future adapters |
 | [Configuration](docs/configuration.md) | All environment variables, defaults, and secrets management |
+| [Web Frontend Design](docs/web-frontend-design.md) | Web UI architecture, API endpoints, frontend pages, deployment |
