@@ -9,6 +9,9 @@ primary_region = "sjc"
   source = "worldlines_data"
   destination = "/data"
 
+[processes]
+  app = "worldlines"
+
 [[vm]]
   size = "shared-cpu-1x"
   memory = "256mb"
