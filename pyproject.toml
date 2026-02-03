@@ -13,6 +13,8 @@ dependencies = [
     "feedparser",
     "python-dotenv",
     "apscheduler>=3.10,<4",
+    "fastapi>=0.110,<1",
+    "uvicorn[standard]>=0.29,<1",
 ]
 
 [project.optional-dependencies]
@@ -24,6 +26,7 @@ dev = [
 
 [project.scripts]
 worldlines = "worldlines.main:main"
+worldlines-web = "worldlines.web.main:main"
 
 [tool.hatch.build.targets.wheel]
 packages = ["src/worldlines"]
