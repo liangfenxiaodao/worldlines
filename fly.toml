@@ -25,3 +25,4 @@ primary_region = "sjc"
   force_https = true
   auto_start_machines = true
   auto_stop_machines = false
+  processes = ["app"]
