@@ -1,19 +1,22 @@
-"""Application entry point."""
+"""Application entry point — runs scheduler + web server in a single process."""
 
 from __future__ import annotations
 
 import json
 import logging
-import signal
 import sys
+from contextlib import asynccontextmanager
 
-from apscheduler.schedulers.blocking import BlockingScheduler
+import uvicorn
+from apscheduler.schedulers.background import BackgroundScheduler
 from apscheduler.triggers.cron import CronTrigger
 from apscheduler.triggers.interval import IntervalTrigger
 
 from worldlines.config import load_config
 from worldlines.jobs import run_digest, run_pipeline
 from worldlines.storage import init_db
+from worldlines.web.app import create_app
+from worldlines.web.config import WebConfig
 
 logger = logging.getLogger("worldlines")
 
@@ -44,37 +47,9 @@ def _setup_logging(log_level: str, log_format: str) -> None:
     root.addHandler(handler)
 
 
-def main() -> None:
-    """Load config, set up logging, and start the application."""
-    config = load_config()
-
-    _setup_logging(config.log_level, config.log_format)
-
-    logger.info(
-        "Worldlines starting (env=%s, db=%s, model=%s)",
-        config.app_env,
-        config.database_path,
-        config.llm_model,
-    )
-
-    init_db(config.database_path)
-
-    scheduler = BlockingScheduler()
-
-    def _handle_signal(signum: int, _frame: object) -> None:
-        sig_name = signal.Signals(signum).name
-        logger.info("Received %s, shutting down", sig_name)
-        scheduler.shutdown(wait=False)
-
-    signal.signal(signal.SIGTERM, _handle_signal)
-    signal.signal(signal.SIGINT, _handle_signal)
-
-    # Run pipeline once at startup (non-fatal — scheduler must start regardless)
-    logger.info("Running initial pipeline")
-    try:
-        run_pipeline(config)
-    except Exception:
-        logger.exception("Initial pipeline failed; scheduler will continue")
+def _build_scheduler(config):
+    """Create and configure a BackgroundScheduler with pipeline and digest jobs."""
+    scheduler = BackgroundScheduler()
 
     # Schedule pipeline (ingestion + analysis) on interval
     scheduler.add_job(
@@ -102,8 +77,45 @@ def main() -> None:
         name="Daily digest",
     )
 
-    logger.info("Scheduler starting")
-    scheduler.start()
+    return scheduler
+
+
+def main() -> None:
+    """Load config, set up logging, and start scheduler + web server."""
+    config = load_config()
+    web_config = WebConfig(database_path=config.database_path)
+
+    _setup_logging(config.log_level, config.log_format)
+
+    logger.info(
+        "Worldlines starting (env=%s, db=%s, model=%s)",
+        config.app_env,
+        config.database_path,
+        config.llm_model,
+    )
+
+    init_db(config.database_path)
+
+    # Run pipeline once at startup (non-fatal — scheduler must start regardless)
+    logger.info("Running initial pipeline")
+    try:
+        run_pipeline(config)
+    except Exception:
+        logger.exception("Initial pipeline failed; scheduler will continue")
+
+    scheduler = _build_scheduler(config)
+
+    @asynccontextmanager
+    async def lifespan(app):
+        logger.info("Scheduler starting")
+        scheduler.start()
+        yield
+        logger.info("Scheduler shutting down")
+        scheduler.shutdown(wait=False)
+
+    app = create_app(web_config, lifespan=lifespan)
+
+    uvicorn.run(app, host=web_config.web_host, port=web_config.web_port)
 
 
 if __name__ == "__main__":

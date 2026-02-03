@@ -11,9 +11,9 @@ from worldlines.web.config import WebConfig
 from worldlines.web.routes import router
 
 
-def create_app(config: WebConfig) -> FastAPI:
+def create_app(config: WebConfig, lifespan=None) -> FastAPI:
     """Build and return a configured FastAPI application."""
-    app = FastAPI(title="Worldlines", docs_url="/api/docs")
+    app = FastAPI(title="Worldlines", docs_url="/api/docs", lifespan=lifespan)
     app.state.database_path = config.database_path
     app.include_router(router, prefix="/api/v1")
 

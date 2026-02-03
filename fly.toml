@@ -19,3 +19,9 @@ primary_region = "sjc"
 [[vm]]
   size = "shared-cpu-1x"
   memory = "256mb"
+
+[http_service]
+  internal_port = 8080
+  force_https = true
+  auto_start_machines = true
+  auto_stop_machines = false
