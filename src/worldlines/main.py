@@ -69,9 +69,12 @@ def main() -> None:
     signal.signal(signal.SIGTERM, _handle_signal)
     signal.signal(signal.SIGINT, _handle_signal)
 
-    # Run pipeline once at startup
+    # Run pipeline once at startup (non-fatal — scheduler must start regardless)
     logger.info("Running initial pipeline")
-    run_pipeline(config)
+    try:
+        run_pipeline(config)
+    except Exception:
+        logger.exception("Initial pipeline failed; scheduler will continue")
 
     # Schedule pipeline (ingestion + analysis) on interval
     scheduler.add_job(
