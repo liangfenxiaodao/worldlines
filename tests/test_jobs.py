@@ -4,9 +4,7 @@ from __future__ import annotations
 
 import json
 from datetime import datetime, timezone
-from unittest.mock import MagicMock, call, patch
-
-import pytest
+from unittest.mock import MagicMock, patch
 
 from worldlines.config import Config
 from worldlines.ingestion.normalize import NormalizedItem, NormalizationResult

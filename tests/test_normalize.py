@@ -10,7 +10,6 @@ import pytest
 from worldlines.ingestion.dedup import compute_dedup_hash
 from worldlines.ingestion.normalize import (
     NormalizedItem,
-    NormalizationResult,
     RawSourceItem,
     ingest_item,
     normalize,
