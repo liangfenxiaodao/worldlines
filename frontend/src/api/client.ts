@@ -4,6 +4,8 @@ import type {
   ItemDetailResponse,
   ItemListResponse,
   ItemsParams,
+  PipelineRunListResponse,
+  RunsParams,
   StatsResponse,
 } from "../types/api";
 
@@ -47,4 +49,15 @@ export function fetchItems(params: ItemsParams = {}): Promise<ItemListResponse> 
 
 export function fetchItem(id: string): Promise<ItemDetailResponse> {
   return request<ItemDetailResponse>(`/items/${encodeURIComponent(id)}`);
+}
+
+export function fetchRuns(params: RunsParams = {}): Promise<PipelineRunListResponse> {
+  const qs = new URLSearchParams();
+  for (const [k, v] of Object.entries(params)) {
+    if (v !== undefined && v !== "") {
+      qs.set(k, String(v));
+    }
+  }
+  const q = qs.toString();
+  return request<PipelineRunListResponse>(`/runs${q ? `?${q}` : ""}`);
 }

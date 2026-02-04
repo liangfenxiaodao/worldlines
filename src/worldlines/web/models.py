@@ -100,3 +100,24 @@ class AnalysisDetail(BaseModel):
 class ItemDetailResponse(BaseModel):
     item: ItemDetail
     analysis: AnalysisDetail | None
+
+
+# ---------------------------------------------------------------------------
+# Pipeline Runs
+# ---------------------------------------------------------------------------
+class PipelineRun(BaseModel):
+    id: str
+    run_type: str
+    started_at: str
+    finished_at: str
+    status: str
+    result: dict
+    error: str | None
+
+
+class PipelineRunListResponse(BaseModel):
+    runs: list[PipelineRun]
+    total: int
+    page: int
+    per_page: int
+    pages: int

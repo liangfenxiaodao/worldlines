@@ -502,6 +502,7 @@ class TestGenerateDigest:
         mock_send.return_value = [SendResult(ok=True, message_id=100)]
         result = generate_digest(
             "2025-06-15", "2025-06-15T00:00:00",
+            until="2025-06-16T00:00:00",
             database_path=seeded_db, bot_token="tok", chat_id="cid",
             api_key="test-key", model="test-model",
         )
@@ -517,6 +518,7 @@ class TestGenerateDigest:
         mock_send.return_value = [SendResult(ok=True, message_id=101)]
         result = generate_digest(
             "2025-06-15", "2025-06-15T00:00:00",
+            until="2025-06-16T00:00:00",
             database_path=db_path, bot_token="tok", chat_id="cid",
             api_key="test-key", model="test-model",
         )
@@ -533,6 +535,7 @@ class TestGenerateDigest:
         mock_send.return_value = [SendResult(ok=False, error="Telegram down")]
         result = generate_digest(
             "2025-06-15", "2025-06-15T00:00:00",
+            until="2025-06-16T00:00:00",
             database_path=seeded_db, bot_token="tok", chat_id="cid",
             api_key="test-key", model="test-model",
         )
@@ -551,12 +554,14 @@ class TestGenerateDigest:
         # First digest
         generate_digest(
             "2025-06-15", "2025-06-15T00:00:00",
+            until="2025-06-16T00:00:00",
             database_path=seeded_db, bot_token="tok", chat_id="cid",
             api_key="test-key", model="test-model",
         )
         # Second digest for same date
         result = generate_digest(
             "2025-06-15", "2025-06-15T00:00:00",
+            until="2025-06-16T00:00:00",
             database_path=seeded_db, bot_token="tok", chat_id="cid",
             api_key="test-key", model="test-model",
         )
@@ -572,6 +577,7 @@ class TestGenerateDigest:
         mock_send.return_value = [SendResult(ok=True, message_id=103)]
         result = generate_digest(
             "2025-06-15", "2025-06-15T00:00:00",
+            until="2025-06-16T00:00:00",
             database_path=seeded_db, bot_token="tok", chat_id="cid",
             api_key="test-key", model="test-model",
         )
@@ -596,6 +602,7 @@ class TestGenerateDigest:
         ]
         result = generate_digest(
             "2025-06-15", "2025-06-15T00:00:00",
+            until="2025-06-16T00:00:00",
             database_path=seeded_db, bot_token="tok", chat_id="cid",
             api_key="test-key", model="test-model",
         )
@@ -610,6 +617,7 @@ class TestGenerateDigest:
         mock_send.return_value = [SendResult(ok=True, message_id=100)]
         generate_digest(
             "2025-06-15", "2025-06-15T00:00:00",
+            until="2025-06-16T00:00:00",
             database_path=seeded_db, bot_token="tok", chat_id="cid",
             api_key="test-key", model="test-model",
         )
@@ -629,6 +637,7 @@ class TestGenerateDigest:
         mock_send.return_value = [SendResult(ok=True, message_id=100)]
         result = generate_digest(
             "2025-06-15", "2025-06-15T00:00:00",
+            until="2025-06-16T00:00:00",
             database_path=seeded_db, bot_token="tok", chat_id="cid",
             api_key="test-key", model="test-model",
         )
@@ -652,6 +661,7 @@ class TestGenerateDigest:
         mock_send.return_value = [SendResult(ok=True, message_id=100)]
         result = generate_digest(
             "2025-06-15", "2025-06-15T00:00:00",
+            until="2025-06-16T00:00:00",
             database_path=seeded_db, bot_token="tok", chat_id="cid",
             api_key="test-key", model="test-model",
         )
@@ -666,6 +676,7 @@ class TestGenerateDigest:
         mock_send.return_value = [SendResult(ok=True, message_id=101)]
         generate_digest(
             "2025-06-15", "2025-06-15T00:00:00",
+            until="2025-06-16T00:00:00",
             database_path=db_path, bot_token="tok", chat_id="cid",
             api_key="test-key", model="test-model",
         )

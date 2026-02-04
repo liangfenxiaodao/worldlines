@@ -272,10 +272,14 @@ class TestRunAnalysis:
 
 
 class TestRunDigest:
+    @patch("worldlines.jobs._record_run")
     @patch("worldlines.jobs.generate_digest")
-    def test_calls_generate_digest_with_correct_args(self, mock_gen, tmp_path):
+    def test_calls_generate_digest_with_correct_args(self, mock_gen, mock_record, tmp_path):
         config = _make_config(tmp_path)
-        mock_gen.return_value = MagicMock(delivery_status="sent", error=None)
+        mock_gen.return_value = MagicMock(
+            delivery_status="sent", error=None,
+            digest_record={"item_count": 3},
+        )
 
         with patch("worldlines.jobs.datetime") as mock_dt:
             fake_now = datetime(2025, 6, 15, 14, 30, 0, tzinfo=timezone.utc)
@@ -287,6 +291,7 @@ class TestRunDigest:
         mock_gen.assert_called_once_with(
             "2025-06-15",
             "2025-06-15T00:00:00+00:00",
+            until="2025-06-16T00:00:00+00:00",
             database_path=config.database_path,
             bot_token="test-token",
             chat_id="test-chat",
@@ -297,10 +302,14 @@ class TestRunDigest:
             max_retries=1,
         )
 
+    @patch("worldlines.jobs._record_run")
     @patch("worldlines.jobs.generate_digest")
-    def test_logs_delivery_status(self, mock_gen, tmp_path):
+    def test_logs_delivery_status(self, mock_gen, mock_record, tmp_path):
         config = _make_config(tmp_path)
-        mock_gen.return_value = MagicMock(delivery_status="empty_day", error=None)
+        mock_gen.return_value = MagicMock(
+            delivery_status="empty_day", error=None,
+            digest_record={"item_count": 0},
+        )
 
         with patch("worldlines.jobs.datetime") as mock_dt:
             fake_now = datetime(2025, 6, 15, 14, 30, 0, tzinfo=timezone.utc)

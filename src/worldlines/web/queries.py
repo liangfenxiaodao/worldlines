@@ -274,3 +274,52 @@ def get_item_by_id(database_path: str, item_id: str) -> dict | None:
         }
 
     return {"item": item, "analysis": analysis}
+
+
+# ---------------------------------------------------------------------------
+# list_pipeline_runs
+# ---------------------------------------------------------------------------
+def list_pipeline_runs(
+    database_path: str,
+    run_type: str | None = None,
+    page: int = 1,
+    per_page: int = 50,
+) -> tuple[list[dict], int]:
+    """Return a paginated list of pipeline runs, newest first."""
+    offset = (page - 1) * per_page
+    conditions: list[str] = []
+    params: list[object] = []
+
+    if run_type is not None:
+        conditions.append("run_type = ?")
+        params.append(run_type)
+
+    where_clause = ""
+    if conditions:
+        where_clause = "WHERE " + " AND ".join(conditions)
+
+    with get_readonly_connection(database_path) as conn:
+        total = conn.execute(
+            f"SELECT COUNT(*) FROM pipeline_runs {where_clause}", params,
+        ).fetchone()[0]
+
+        rows = conn.execute(
+            f"SELECT id, run_type, started_at, finished_at, status, result, error "
+            f"FROM pipeline_runs {where_clause} "
+            f"ORDER BY started_at DESC LIMIT ? OFFSET ?",
+            [*params, per_page, offset],
+        ).fetchall()
+
+    runs = []
+    for r in rows:
+        runs.append({
+            "id": r["id"],
+            "run_type": r["run_type"],
+            "started_at": r["started_at"],
+            "finished_at": r["finished_at"],
+            "status": r["status"],
+            "result": json.loads(r["result"]),
+            "error": r["error"],
+        })
+
+    return runs, total

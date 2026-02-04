@@ -9,7 +9,7 @@ import pytest
 from worldlines.storage.connection import get_connection
 from worldlines.storage.schema import init_db
 
-EXPECTED_TABLES = {"items", "analyses", "exposures", "deduplication_records", "digests", "adapter_state", "temporal_links"}
+EXPECTED_TABLES = {"items", "analyses", "exposures", "deduplication_records", "digests", "adapter_state", "temporal_links", "pipeline_runs"}
 
 EXPECTED_INDEXES = {
     "idx_items_timestamp",
@@ -26,6 +26,8 @@ EXPECTED_INDEXES = {
     "idx_temporal_links_source_item_id",
     "idx_temporal_links_target_item_id",
     "idx_temporal_links_link_type",
+    "idx_pipeline_runs_started_at",
+    "idx_pipeline_runs_run_type",
 }
 
 

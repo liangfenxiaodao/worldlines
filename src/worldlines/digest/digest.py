@@ -7,7 +7,7 @@ import logging
 import sqlite3
 import uuid
 from dataclasses import dataclass, field
-from datetime import date, datetime, timedelta, timezone
+from datetime import datetime, timezone
 
 from worldlines.digest.renderer import (
     chunk_message,
@@ -62,6 +62,7 @@ def generate_digest(
     digest_date: str,
     since: str,
     *,
+    until: str,
     database_path: str,
     bot_token: str,
     chat_id: str,
@@ -80,9 +81,6 @@ def generate_digest(
     5. Persist digest record.
     6. Return result.
     """
-    # Compute end of window: day after digest_date
-    next_day = date.fromisoformat(digest_date) + timedelta(days=1)
-    until = next_day.isoformat()
 
     # Query
     rows = _query_analyses(database_path, since, until)

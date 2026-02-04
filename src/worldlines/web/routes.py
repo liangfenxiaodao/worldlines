@@ -12,6 +12,7 @@ from worldlines.web.models import (
     ItemDetailResponse,
     ItemListResponse,
     ItemSummary,
+    PipelineRunListResponse,
     StatsResponse,
 )
 from worldlines.web.queries import (
@@ -20,6 +21,7 @@ from worldlines.web.queries import (
     get_stats,
     list_digests,
     list_items,
+    list_pipeline_runs,
 )
 
 router = APIRouter()
@@ -118,3 +120,24 @@ def item_by_id(request: Request, item_id: str) -> ItemDetailResponse:
     if data is None:
         raise HTTPException(status_code=404, detail="Item not found")
     return ItemDetailResponse(**data)
+
+
+@router.get("/runs", response_model=PipelineRunListResponse)
+def runs(
+    request: Request,
+    run_type: str | None = None,
+    page: int = Query(1, ge=1),
+    per_page: int = Query(50, ge=1, le=100),
+) -> PipelineRunListResponse:
+    database_path = request.app.state.database_path
+    rows, total = list_pipeline_runs(
+        database_path, run_type=run_type, page=page, per_page=per_page,
+    )
+    pages = math.ceil(total / per_page) if total else 0
+    return PipelineRunListResponse(
+        runs=rows,
+        total=total,
+        page=page,
+        per_page=per_page,
+        pages=pages,
+    )

@@ -81,6 +81,32 @@ def _seed_analysis(conn, analysis_id, item_id, **overrides):
     )
 
 
+def _seed_pipeline_run(conn, run_id, run_type, **overrides):
+    """Insert a test pipeline run into the pipeline_runs table."""
+    defaults = {
+        "started_at": "2025-06-15T10:00:00+00:00",
+        "finished_at": "2025-06-15T10:00:05+00:00",
+        "status": "success",
+        "result": {"items_new": 5, "items_duplicate": 2},
+        "error": None,
+    }
+    defaults.update(overrides)
+    conn.execute(
+        "INSERT INTO pipeline_runs "
+        "(id, run_type, started_at, finished_at, status, result, error) "
+        "VALUES (?, ?, ?, ?, ?, ?, ?)",
+        (
+            run_id,
+            run_type,
+            defaults["started_at"],
+            defaults["finished_at"],
+            defaults["status"],
+            json.dumps(defaults["result"]),
+            defaults["error"],
+        ),
+    )
+
+
 def _seed_digest(conn, digest_id, digest_date, **overrides):
     """Insert a test digest into the digests table."""
     defaults = {
@@ -191,6 +217,26 @@ def seeded_db(db_path):
             summary_zh="Digest的中文摘要。",
         )
         _seed_digest(conn, "digest-2", "2025-06-14", item_count=2)
+
+        # Pipeline runs
+        _seed_pipeline_run(
+            conn, "run-1", "ingestion",
+            started_at="2025-06-15T10:00:00+00:00",
+            finished_at="2025-06-15T10:00:05+00:00",
+            result={"items_new": 5, "items_duplicate": 2},
+        )
+        _seed_pipeline_run(
+            conn, "run-2", "analysis",
+            started_at="2025-06-15T10:01:00+00:00",
+            finished_at="2025-06-15T10:01:30+00:00",
+            result={"items_found": 5, "items_analyzed": 5, "errors": 0},
+        )
+        _seed_pipeline_run(
+            conn, "run-3", "digest",
+            started_at="2025-06-15T18:00:00+00:00",
+            finished_at="2025-06-15T18:00:10+00:00",
+            result={"digest_date": "2025-06-15", "items_included": 3, "delivery_status": "sent"},
+        )
 
     return db_path
 
@@ -330,6 +376,40 @@ class TestItems:
     def test_get_item_by_id_not_found(self, client):
         resp = client.get("/api/v1/items/nonexistent")
         assert resp.status_code == 404
+
+
+# --- Tests: Edge Cases ---
+
+
+# --- Tests: Pipeline Runs ---
+
+
+class TestPipelineRuns:
+    def test_list_runs_returns_paginated(self, client):
+        resp = client.get("/api/v1/runs")
+        assert resp.status_code == 200
+        data = resp.json()
+        for key in ("runs", "total", "page", "per_page", "pages"):
+            assert key in data
+        assert data["total"] == 3
+        assert data["page"] == 1
+        # Verify run structure
+        run = data["runs"][0]
+        for key in ("id", "run_type", "started_at", "finished_at", "status", "result"):
+            assert key in run
+
+    def test_list_runs_filter_by_type(self, client):
+        data = client.get("/api/v1/runs?run_type=ingestion").json()
+        assert data["total"] == 1
+        assert data["runs"][0]["run_type"] == "ingestion"
+
+        data = client.get("/api/v1/runs?run_type=analysis").json()
+        assert data["total"] == 1
+        assert data["runs"][0]["run_type"] == "analysis"
+
+        data = client.get("/api/v1/runs?run_type=digest").json()
+        assert data["total"] == 1
+        assert data["runs"][0]["run_type"] == "digest"
 
 
 # --- Tests: Edge Cases ---

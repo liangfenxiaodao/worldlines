@@ -122,10 +122,25 @@ CREATE INDEX IF NOT EXISTS idx_dedup_canonical_item_id ON deduplication_records(
 -- Indexes: digests
 CREATE INDEX IF NOT EXISTS idx_digests_sent_at ON digests(sent_at);
 
+-- Pipeline run tracking
+CREATE TABLE IF NOT EXISTS pipeline_runs (
+    id          TEXT PRIMARY KEY,
+    run_type    TEXT NOT NULL CHECK (run_type IN ('ingestion', 'analysis', 'digest')),
+    started_at  TEXT NOT NULL,
+    finished_at TEXT NOT NULL,
+    status      TEXT NOT NULL CHECK (status IN ('success', 'error')),
+    result      TEXT NOT NULL,   -- JSON
+    error       TEXT
+);
+
 -- Indexes: temporal_links
 CREATE INDEX IF NOT EXISTS idx_temporal_links_source_item_id ON temporal_links(source_item_id);
 CREATE INDEX IF NOT EXISTS idx_temporal_links_target_item_id ON temporal_links(target_item_id);
 CREATE INDEX IF NOT EXISTS idx_temporal_links_link_type ON temporal_links(link_type);
+
+-- Indexes: pipeline_runs
+CREATE INDEX IF NOT EXISTS idx_pipeline_runs_started_at ON pipeline_runs(started_at);
+CREATE INDEX IF NOT EXISTS idx_pipeline_runs_run_type ON pipeline_runs(run_type);
 """
 
 

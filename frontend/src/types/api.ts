@@ -93,6 +93,30 @@ export interface ItemDetailResponse {
   analysis: AnalysisDetail | null;
 }
 
+export interface PipelineRun {
+  id: string;
+  run_type: string;
+  started_at: string;
+  finished_at: string;
+  status: string;
+  result: Record<string, unknown>;
+  error: string | null;
+}
+
+export interface PipelineRunListResponse {
+  runs: PipelineRun[];
+  total: number;
+  page: number;
+  per_page: number;
+  pages: number;
+}
+
+export interface RunsParams {
+  run_type?: string;
+  page?: number;
+  per_page?: number;
+}
+
 export interface ItemsParams {
   dimension?: string;
   change_type?: string;
