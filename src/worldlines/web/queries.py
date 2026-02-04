@@ -114,6 +114,8 @@ def get_digest_by_date(database_path: str, date: str) -> dict | None:
         "dimension_breakdown": json.loads(row["dimension_breakdown"]),
         "change_type_distribution": json.loads(row["change_type_distribution"]),
         "high_importance_items": json.loads(row["high_importance_items"]),
+        "summary_en": row["summary_en"],
+        "summary_zh": row["summary_zh"],
         "message_text": row["message_text"],
         "sent_at": row["sent_at"],
         "telegram_message_ids": json.loads(row["telegram_message_ids"]),

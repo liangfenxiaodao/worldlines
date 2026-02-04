@@ -32,6 +32,8 @@ class DigestSummary(BaseModel):
 
 class DigestDetail(DigestSummary):
     high_importance_items: list[dict]
+    summary_en: str | None = None
+    summary_zh: str | None = None
     message_text: str
     telegram_message_ids: list[int]
 

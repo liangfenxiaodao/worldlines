@@ -45,6 +45,18 @@ export default function DigestDetail() {
         </div>
       </div>
 
+      {(data.summary_en || data.summary_zh) && (
+        <div className="bg-white rounded shadow px-6 py-4 mb-6">
+          <h2 className="text-sm font-medium text-gray-700 mb-3">Summary</h2>
+          {data.summary_en && (
+            <p className="text-sm text-gray-800 mb-2">{data.summary_en}</p>
+          )}
+          {data.summary_zh && (
+            <p className="text-sm text-gray-600">{data.summary_zh}</p>
+          )}
+        </div>
+      )}
+
       <div className="flex flex-wrap gap-4 mb-6 text-sm">
         <div>
           <h3 className="text-xs text-gray-500 uppercase mb-1">Dimensions</h3>

@@ -21,6 +21,8 @@ export interface DigestSummary {
 
 export interface DigestDetail extends DigestSummary {
   high_importance_items: Record<string, unknown>[];
+  summary_en: string | null;
+  summary_zh: string | null;
   message_text: string;
   telegram_message_ids: number[];
 }

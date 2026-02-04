@@ -88,6 +88,8 @@ def _seed_digest(conn, digest_id, digest_date, **overrides):
         "dimension_breakdown": {"compute_and_computational_paradigms": 2},
         "change_type_distribution": {"reinforcing": 2, "friction": 1},
         "high_importance_items": [{"item_id": "item-1", "analysis_id": "a-1"}],
+        "summary_en": None,
+        "summary_zh": None,
         "message_text": "<b>Test digest</b>",
         "sent_at": f"{digest_date}T18:00:00+00:00",
         "telegram_message_ids": [100],
@@ -96,9 +98,10 @@ def _seed_digest(conn, digest_id, digest_date, **overrides):
     conn.execute(
         "INSERT INTO digests "
         "(id, digest_date, item_count, dimension_breakdown, "
-        "change_type_distribution, high_importance_items, message_text, "
-        "sent_at, telegram_message_ids) "
-        "VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)",
+        "change_type_distribution, high_importance_items, "
+        "summary_en, summary_zh, "
+        "message_text, sent_at, telegram_message_ids) "
+        "VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)",
         (
             digest_id,
             digest_date,
@@ -106,6 +109,8 @@ def _seed_digest(conn, digest_id, digest_date, **overrides):
             json.dumps(defaults["dimension_breakdown"]),
             json.dumps(defaults["change_type_distribution"]),
             json.dumps(defaults["high_importance_items"]),
+            defaults["summary_en"],
+            defaults["summary_zh"],
             defaults["message_text"],
             defaults["sent_at"],
             json.dumps(defaults["telegram_message_ids"]),
@@ -180,7 +185,11 @@ def seeded_db(db_path):
         )
 
         # Digests
-        _seed_digest(conn, "digest-1", "2025-06-15")
+        _seed_digest(
+            conn, "digest-1", "2025-06-15",
+            summary_en="English summary of the digest.",
+            summary_zh="Digest的中文摘要。",
+        )
         _seed_digest(conn, "digest-2", "2025-06-14", item_count=2)
 
     return db_path
@@ -244,6 +253,20 @@ class TestDigests:
         assert data["digest_date"] == "2025-06-15"
         assert "high_importance_items" in data
         assert "message_text" in data
+
+    def test_get_digest_includes_summaries(self, client):
+        resp = client.get("/api/v1/digests/2025-06-15")
+        assert resp.status_code == 200
+        data = resp.json()
+        assert data["summary_en"] == "English summary of the digest."
+        assert data["summary_zh"] == "Digest的中文摘要。"
+
+    def test_get_digest_null_summaries(self, client):
+        resp = client.get("/api/v1/digests/2025-06-14")
+        assert resp.status_code == 200
+        data = resp.json()
+        assert data["summary_en"] is None
+        assert data["summary_zh"] is None
 
     def test_get_digest_by_date_not_found(self, client):
         resp = client.get("/api/v1/digests/1999-01-01")
