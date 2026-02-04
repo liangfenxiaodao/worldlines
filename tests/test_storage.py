@@ -117,16 +117,16 @@ def test_digest_date_unique_constraint(initialized_db):
             conn.execute(
                 "INSERT INTO digests "
                 "(id, digest_date, item_count, dimension_breakdown, change_type_distribution, "
-                "high_importance_items, message_text, sent_at, telegram_message_ids) "
-                "VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)",
-                ("d-1", "2025-01-01", 5, "{}", "{}", "[]", "text", "2025-01-01T18:00:00Z", "[]"),
+                "high_importance_items, summary_en, summary_zh, message_text, sent_at, telegram_message_ids) "
+                "VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)",
+                ("d-1", "2025-01-01", 5, "{}", "{}", "[]", None, None, "text", "2025-01-01T18:00:00Z", "[]"),
             )
             conn.execute(
                 "INSERT INTO digests "
                 "(id, digest_date, item_count, dimension_breakdown, change_type_distribution, "
-                "high_importance_items, message_text, sent_at, telegram_message_ids) "
-                "VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)",
-                ("d-2", "2025-01-01", 3, "{}", "{}", "[]", "text2", "2025-01-01T18:00:01Z", "[]"),
+                "high_importance_items, summary_en, summary_zh, message_text, sent_at, telegram_message_ids) "
+                "VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)",
+                ("d-2", "2025-01-01", 3, "{}", "{}", "[]", None, None, "text2", "2025-01-01T18:00:01Z", "[]"),
             )
 
 

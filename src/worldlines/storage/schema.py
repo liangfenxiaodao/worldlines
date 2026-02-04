@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 import logging
+import sqlite3
 
 from worldlines.storage.connection import get_connection
 
@@ -72,6 +73,8 @@ CREATE TABLE IF NOT EXISTS digests (
     dimension_breakdown         TEXT NOT NULL,  -- JSON object
     change_type_distribution    TEXT NOT NULL,  -- JSON object
     high_importance_items       TEXT NOT NULL,  -- JSON array
+    summary_en                  TEXT,           -- AI synthesis (nullable)
+    summary_zh                  TEXT,           -- AI synthesis (nullable)
     message_text                TEXT NOT NULL,
     sent_at                     TEXT NOT NULL,
     telegram_message_ids        TEXT NOT NULL   -- JSON array
@@ -126,8 +129,18 @@ CREATE INDEX IF NOT EXISTS idx_temporal_links_link_type ON temporal_links(link_t
 """
 
 
+def _migrate_digests_summary(conn: sqlite3.Connection) -> None:
+    """Add summary_en and summary_zh columns to existing digests table."""
+    for col in ("summary_en", "summary_zh"):
+        try:
+            conn.execute(f"ALTER TABLE digests ADD COLUMN {col} TEXT")  # noqa: S608
+        except sqlite3.OperationalError:
+            pass  # Column already exists
+
+
 def init_db(database_path: str) -> None:
     """Create all tables and indexes if they do not already exist."""
     with get_connection(database_path) as conn:
         conn.executescript(_SCHEMA_SQL)
+        _migrate_digests_summary(conn)
     logger.info("Database initialized at %s", database_path)

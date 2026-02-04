@@ -242,6 +242,8 @@ def _build_record(
         "dimension_breakdown": data.dimension_breakdown,
         "change_type_distribution": data.change_type_distribution,
         "high_importance_items": high_items,
+        "summary_en": None,
+        "summary_zh": None,
         "message_text": message_text,
         "sent_at": datetime.now(timezone.utc).isoformat(),
         "telegram_message_ids": message_ids,
@@ -254,9 +256,10 @@ def _persist_digest(record: dict, database_path: str) -> None:
         conn.execute(
             "INSERT INTO digests "
             "(id, digest_date, item_count, dimension_breakdown, "
-            "change_type_distribution, high_importance_items, message_text, "
-            "sent_at, telegram_message_ids) "
-            "VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)",
+            "change_type_distribution, high_importance_items, "
+            "summary_en, summary_zh, "
+            "message_text, sent_at, telegram_message_ids) "
+            "VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)",
             (
                 record["id"],
                 record["digest_date"],
@@ -264,6 +267,8 @@ def _persist_digest(record: dict, database_path: str) -> None:
                 json.dumps(record["dimension_breakdown"]),
                 json.dumps(record["change_type_distribution"]),
                 json.dumps(record["high_importance_items"]),
+                record.get("summary_en"),
+                record.get("summary_zh"),
                 record["message_text"],
                 record["sent_at"],
                 json.dumps(record["telegram_message_ids"]),
