@@ -67,7 +67,7 @@ export default function DigestDetail() {
       <div className="bg-white rounded shadow px-6 py-4">
         <h2 className="text-sm font-medium text-gray-700 mb-3">Message</h2>
         <div
-          className="prose prose-sm max-w-none"
+          className="text-sm whitespace-pre-wrap [&_b]:font-semibold [&_a]:text-blue-600 [&_a]:underline"
           dangerouslySetInnerHTML={{ __html: data.message_text }}
         />
       </div>
