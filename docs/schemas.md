@@ -392,6 +392,16 @@ A **Daily Digest Record** captures the content of a Telegram daily digest sent t
       },
       "description": "Items with importance medium or high, included with their summaries."
     },
+    "summary_en": {
+      "type": ["string", "null"],
+      "maxLength": 1000,
+      "description": "AI-generated English synthesis summary of the day's structural signals. Null on empty days."
+    },
+    "summary_zh": {
+      "type": ["string", "null"],
+      "maxLength": 1000,
+      "description": "AI-generated Chinese (Simplified) synthesis summary of the day's structural signals. Independently generated, not a translation. Null on empty days."
+    },
     "message_text": {
       "type": "string",
       "description": "The rendered message text as sent to Telegram."
@@ -412,6 +422,7 @@ A **Daily Digest Record** captures the content of a Telegram daily digest sent t
 
 ### Notes
 
+- `summary_en` and `summary_zh` are AI-generated synthesis summaries that distill the day's items into key structural observations. They are independently generated in each language (not translations) and follow the system's neutrality constraints. Null on empty days.
 - `high_importance_items` includes items with `importance` of `medium` or `high` to surface the most structurally relevant signals.
 - `message_text` preserves exactly what was sent, enabling review without re-rendering.
 - `telegram_message_ids` is an array because long digests may be split across multiple Telegram messages.

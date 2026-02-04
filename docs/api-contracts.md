@@ -206,14 +206,15 @@ Generates a daily digest from the day's analyzed items and delivers it via Teleg
 1. Query the Analysis Store for all AnalyticalOutputs with `analyzed_at` within the digest window
 2. Aggregate by dimension and change type
 3. Select items with `importance` of `medium` or `high` for inclusion with summaries
-4. Render the digest into Telegram-formatted message text (MarkdownV2 or HTML)
-5. Split into multiple messages if content exceeds 4096 characters
+4. **Generate bilingual synthesis summary** — call the AI layer with the day's items to produce a short structural summary in English (`summary_en`) and Chinese (`summary_zh`). Both are independently generated (not translations). Skipped on empty days.
+5. Render the digest into Telegram-formatted message text (MarkdownV2 or HTML), with the bilingual summary placed after the header and before individual items
+6. Split into multiple messages if content exceeds 4096 characters
 
 ### 6.4 Output: Telegram Delivery Result
 
 ```json
 {
-  "digest_record": "DailyDigestRecord (as defined in schemas.md)",
+  "digest_record": "DailyDigestRecord (as defined in schemas.md) — now includes summary_en and summary_zh fields",
   "delivery_status": "string — enum: sent | empty_day | failed",
   "error": "string | null — present if delivery_status is 'failed'"
 }

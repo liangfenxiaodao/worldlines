@@ -344,10 +344,22 @@ Past items may be re-analyzed with updated frameworks.
 The primary output surface is a **daily Telegram digest** delivered to a configured chat.
 
 The digest includes:
+- **Bilingual synthesis summary** (English and Chinese) — an AI-generated paragraph that synthesizes the day's structural signals into a cohesive narrative, placed at the top of the digest before individual items
 - Number of items ingested and analyzed
 - Breakdown by structural dimension
 - High-importance items with neutral summaries
 - Change type distribution (reinforcing / friction / early signal / neutral)
+
+#### Digest Summary
+Each digest begins with a short AI-generated summary that distills the day's items into key structural observations. The summary is produced in both **English** and **Chinese** (Simplified) to support bilingual readers.
+
+Summary constraints:
+- Neutral and non-predictive — follows the same analytical stance as item-level summaries
+- Synthesizes across items rather than repeating individual summaries
+- Highlights cross-dimensional patterns, emerging themes, or notable structural shifts
+- Each language version is independently generated (not a translation) to ensure natural phrasing
+- Persisted as `summary_en` and `summary_zh` in the digest record
+- Empty-day digests do not include a summary
 
 Design constraints:
 - Messages follow Telegram's formatting and 4096-character limit
