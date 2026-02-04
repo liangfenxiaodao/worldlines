@@ -15,8 +15,7 @@ primary_region = "sjc"
   destination = "/data"
 
 [processes]
-  worker = "worldlines"
-  web    = "worldlines-web"
+  app = "worldlines"
 
 [[vm]]
   size = "shared-cpu-1x"
@@ -27,4 +26,4 @@ primary_region = "sjc"
   force_https = true
   auto_start_machines = true
   auto_stop_machines = false
-  processes = ["web"]
+  processes = ["app"]
