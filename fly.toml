@@ -8,13 +8,15 @@ primary_region = "sjc"
   ANALYSIS_VERSION = "v1"
   DIGEST_SCHEDULE_CRON = "0 7 * * *"
   DIGEST_TIMEZONE = "Australia/Melbourne"
+  STATIC_DIR = "/app/static"
 
 [mounts]
   source = "worldlines_data"
   destination = "/data"
 
 [processes]
-  app = "worldlines"
+  worker = "worldlines"
+  web    = "worldlines-web"
 
 [[vm]]
   size = "shared-cpu-1x"
@@ -25,4 +27,4 @@ primary_region = "sjc"
   force_https = true
   auto_start_machines = true
   auto_stop_machines = false
-  processes = ["app"]
+  processes = ["web"]

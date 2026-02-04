@@ -1,3 +1,11 @@
+FROM node:20-slim AS frontend-builder
+
+WORKDIR /build
+COPY frontend/package.json frontend/package-lock.json ./
+RUN npm ci
+COPY frontend/ .
+RUN npm run build
+
 FROM python:3.12-slim AS builder
 
 WORKDIR /build
@@ -10,6 +18,8 @@ FROM python:3.12-slim
 
 COPY --from=builder /usr/local/lib/python3.12/site-packages /usr/local/lib/python3.12/site-packages
 COPY --from=builder /usr/local/bin/worldlines /usr/local/bin/worldlines
+COPY --from=builder /usr/local/bin/worldlines-web /usr/local/bin/worldlines-web
+COPY --from=frontend-builder /build/dist /app/static/
 COPY src/ /app/src/
 COPY config/ /app/config/
 
