@@ -25,7 +25,12 @@ CHANGE_TYPE_DISPLAY = {
 TELEGRAM_MAX_LENGTH = 4096
 
 
-def render_digest_html(data) -> str:
+def render_digest_html(
+    data,
+    *,
+    summary_en: str | None = None,
+    summary_zh: str | None = None,
+) -> str:
     """Render a full digest as Telegram-flavoured HTML.
 
     ``data`` is a DigestData instance (imported at call-time to avoid circular
@@ -37,6 +42,15 @@ def render_digest_html(data) -> str:
     lines.append("<b>Worldlines Daily Digest</b>")
     lines.append(f"<i>{data.digest_date} | {data.total_analyzed} items analyzed</i>")
     lines.append("")
+
+    # Summary (if available)
+    if summary_en or summary_zh:
+        lines.append("<b>Summary</b>")
+        if summary_en:
+            lines.append(html.escape(summary_en))
+        if summary_zh:
+            lines.append(html.escape(summary_zh))
+        lines.append("")
 
     # Dimension breakdown
     lines.append("<b>Dimension Breakdown</b>")

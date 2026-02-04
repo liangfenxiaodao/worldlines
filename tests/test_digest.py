@@ -262,6 +262,39 @@ class TestRenderDigestHtml:
         # Count Source links — should be exactly 1
         assert html.count(">Source</a>") == 1
 
+    def test_contains_summary_section(self):
+        result = render_digest_html(
+            self._make_data(),
+            summary_en="Today saw major shifts in compute.",
+            summary_zh="今天计算领域发生了重大变化。",
+        )
+        assert "<b>Summary</b>" in result
+        assert "Today saw major shifts in compute." in result
+        assert "今天计算领域发生了重大变化。" in result
+
+    def test_summary_before_dimension_breakdown(self):
+        result = render_digest_html(
+            self._make_data(),
+            summary_en="English summary here.",
+            summary_zh="中文摘要。",
+        )
+        summary_pos = result.index("<b>Summary</b>")
+        dimension_pos = result.index("<b>Dimension Breakdown</b>")
+        assert summary_pos < dimension_pos
+
+    def test_no_summary_section_when_none(self):
+        result = render_digest_html(self._make_data())
+        assert "<b>Summary</b>" not in result
+
+    def test_summary_html_escaped(self):
+        result = render_digest_html(
+            self._make_data(),
+            summary_en="AI <boom> & impact",
+            summary_zh="人工智能<爆发> & 影响",
+        )
+        assert "AI &lt;boom&gt; &amp; impact" in result
+        assert "人工智能&lt;爆发&gt; &amp; 影响" in result
+
 
 # --- TestRenderEmptyDayHtml ---
 

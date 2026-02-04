@@ -122,7 +122,7 @@ def generate_digest(
         summary_zh = summary_result.summary_zh
 
     # Render
-    message_text = render_digest_html(data)
+    message_text = render_digest_html(data, summary_en=summary_en, summary_zh=summary_zh)
     chunks = chunk_message(message_text)
 
     # Send
