@@ -290,6 +290,8 @@ class TestRunDigest:
             database_path=config.database_path,
             bot_token="test-token",
             chat_id="test-chat",
+            api_key="test-key",
+            model="test-model",
             parse_mode="HTML",
             max_items=20,
             max_retries=1,

@@ -65,6 +65,8 @@ def generate_digest(
     database_path: str,
     bot_token: str,
     chat_id: str,
+    api_key: str,
+    model: str,
     parse_mode: str = "HTML",
     max_items: int = 20,
     max_retries: int = 3,
@@ -107,6 +109,18 @@ def generate_digest(
             )
         return DigestResult(digest_record=record, delivery_status="empty_day")
 
+    # Summarize
+    from worldlines.digest.summarizer import generate_digest_summary
+
+    summary_en = None
+    summary_zh = None
+    summary_result = generate_digest_summary(data.items, api_key=api_key, model=model)
+    if summary_result.error:
+        logger.warning("Summarizer failed: %s", summary_result.error)
+    else:
+        summary_en = summary_result.summary_en
+        summary_zh = summary_result.summary_zh
+
     # Render
     message_text = render_digest_html(data)
     chunks = chunk_message(message_text)
@@ -119,7 +133,10 @@ def generate_digest(
     message_ids = [r.message_id for r in results if r.ok]
 
     # Build record
-    record = _build_record(data, message_text, message_ids)
+    record = _build_record(
+        data, message_text, message_ids,
+        summary_en=summary_en, summary_zh=summary_zh,
+    )
 
     # Persist (even on send failure)
     try:
@@ -228,6 +245,9 @@ def _build_record(
     data: DigestData,
     message_text: str,
     message_ids: list[int],
+    *,
+    summary_en: str | None = None,
+    summary_zh: str | None = None,
 ) -> dict:
     """Build a digest record dict ready for persistence."""
     high_items = [
@@ -242,8 +262,8 @@ def _build_record(
         "dimension_breakdown": data.dimension_breakdown,
         "change_type_distribution": data.change_type_distribution,
         "high_importance_items": high_items,
-        "summary_en": None,
-        "summary_zh": None,
+        "summary_en": summary_en,
+        "summary_zh": summary_zh,
         "message_text": message_text,
         "sent_at": datetime.now(timezone.utc).isoformat(),
         "telegram_message_ids": message_ids,

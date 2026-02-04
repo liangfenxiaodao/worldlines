@@ -460,12 +460,17 @@ class TestPersistDigest:
 
 
 class TestGenerateDigest:
+    @patch("worldlines.digest.summarizer.generate_digest_summary")
     @patch("worldlines.digest.digest.send_messages")
-    def test_sent_status(self, mock_send, seeded_db):
+    def test_sent_status(self, mock_send, mock_summarizer, seeded_db):
+        mock_summarizer.return_value = MagicMock(
+            error=None, summary_en="English summary", summary_zh="中文摘要",
+        )
         mock_send.return_value = [SendResult(ok=True, message_id=100)]
         result = generate_digest(
             "2025-06-15", "2025-06-15T00:00:00",
             database_path=seeded_db, bot_token="tok", chat_id="cid",
+            api_key="test-key", model="test-model",
         )
         assert isinstance(result, DigestResult)
         assert result.delivery_status == "sent"
@@ -473,51 +478,69 @@ class TestGenerateDigest:
         assert result.digest_record is not None
         assert result.digest_record["item_count"] == 3  # high + medium (not low)
 
+    @patch("worldlines.digest.summarizer.generate_digest_summary")
     @patch("worldlines.digest.digest.send_messages")
-    def test_empty_day_status(self, mock_send, db_path):
+    def test_empty_day_status(self, mock_send, mock_summarizer, db_path):
         mock_send.return_value = [SendResult(ok=True, message_id=101)]
         result = generate_digest(
             "2025-06-15", "2025-06-15T00:00:00",
             database_path=db_path, bot_token="tok", chat_id="cid",
+            api_key="test-key", model="test-model",
         )
         assert result.delivery_status == "empty_day"
         assert result.digest_record is not None
         assert result.digest_record["item_count"] == 0
 
+    @patch("worldlines.digest.summarizer.generate_digest_summary")
     @patch("worldlines.digest.digest.send_messages")
-    def test_failed_status_on_send_error(self, mock_send, seeded_db):
+    def test_failed_status_on_send_error(self, mock_send, mock_summarizer, seeded_db):
+        mock_summarizer.return_value = MagicMock(
+            error=None, summary_en="English summary", summary_zh="中文摘要",
+        )
         mock_send.return_value = [SendResult(ok=False, error="Telegram down")]
         result = generate_digest(
             "2025-06-15", "2025-06-15T00:00:00",
             database_path=seeded_db, bot_token="tok", chat_id="cid",
+            api_key="test-key", model="test-model",
         )
         assert result.delivery_status == "failed"
         assert result.error == "Telegram down"
         # Record still persisted
         assert result.digest_record is not None
 
+    @patch("worldlines.digest.summarizer.generate_digest_summary")
     @patch("worldlines.digest.digest.send_messages")
-    def test_duplicate_date_returns_failed(self, mock_send, seeded_db):
+    def test_duplicate_date_returns_failed(self, mock_send, mock_summarizer, seeded_db):
+        mock_summarizer.return_value = MagicMock(
+            error=None, summary_en="English summary", summary_zh="中文摘要",
+        )
         mock_send.return_value = [SendResult(ok=True, message_id=102)]
         # First digest
         generate_digest(
             "2025-06-15", "2025-06-15T00:00:00",
             database_path=seeded_db, bot_token="tok", chat_id="cid",
+            api_key="test-key", model="test-model",
         )
         # Second digest for same date
         result = generate_digest(
             "2025-06-15", "2025-06-15T00:00:00",
             database_path=seeded_db, bot_token="tok", chat_id="cid",
+            api_key="test-key", model="test-model",
         )
         assert result.delivery_status == "failed"
         assert "Duplicate" in result.error
 
+    @patch("worldlines.digest.summarizer.generate_digest_summary")
     @patch("worldlines.digest.digest.send_messages")
-    def test_persists_to_database(self, mock_send, seeded_db):
+    def test_persists_to_database(self, mock_send, mock_summarizer, seeded_db):
+        mock_summarizer.return_value = MagicMock(
+            error=None, summary_en="English summary", summary_zh="中文摘要",
+        )
         mock_send.return_value = [SendResult(ok=True, message_id=103)]
         result = generate_digest(
             "2025-06-15", "2025-06-15T00:00:00",
             database_path=seeded_db, bot_token="tok", chat_id="cid",
+            api_key="test-key", model="test-model",
         )
         with get_connection(seeded_db) as conn:
             row = conn.execute(
@@ -528,8 +551,12 @@ class TestGenerateDigest:
         assert row["digest_date"] == "2025-06-15"
         assert row["item_count"] == 3
 
+    @patch("worldlines.digest.summarizer.generate_digest_summary")
     @patch("worldlines.digest.digest.send_messages")
-    def test_message_ids_captured(self, mock_send, seeded_db):
+    def test_message_ids_captured(self, mock_send, mock_summarizer, seeded_db):
+        mock_summarizer.return_value = MagicMock(
+            error=None, summary_en="English summary", summary_zh="中文摘要",
+        )
         mock_send.return_value = [
             SendResult(ok=True, message_id=200),
             SendResult(ok=True, message_id=201),
@@ -537,5 +564,76 @@ class TestGenerateDigest:
         result = generate_digest(
             "2025-06-15", "2025-06-15T00:00:00",
             database_path=seeded_db, bot_token="tok", chat_id="cid",
+            api_key="test-key", model="test-model",
         )
         assert result.digest_record["telegram_message_ids"] == [200, 201]
+
+    @patch("worldlines.digest.summarizer.generate_digest_summary")
+    @patch("worldlines.digest.digest.send_messages")
+    def test_summarizer_called_on_non_empty_digest(self, mock_send, mock_summarizer, seeded_db):
+        mock_summarizer.return_value = MagicMock(
+            error=None, summary_en="English summary", summary_zh="中文摘要",
+        )
+        mock_send.return_value = [SendResult(ok=True, message_id=100)]
+        generate_digest(
+            "2025-06-15", "2025-06-15T00:00:00",
+            database_path=seeded_db, bot_token="tok", chat_id="cid",
+            api_key="test-key", model="test-model",
+        )
+        mock_summarizer.assert_called_once()
+        call_kwargs = mock_summarizer.call_args
+        items = call_kwargs[0][0]
+        assert len(items) == 3  # high + medium items
+        assert call_kwargs[1]["api_key"] == "test-key"
+        assert call_kwargs[1]["model"] == "test-model"
+
+    @patch("worldlines.digest.summarizer.generate_digest_summary")
+    @patch("worldlines.digest.digest.send_messages")
+    def test_summarizer_result_persisted(self, mock_send, mock_summarizer, seeded_db):
+        mock_summarizer.return_value = MagicMock(
+            error=None, summary_en="English summary", summary_zh="中文摘要",
+        )
+        mock_send.return_value = [SendResult(ok=True, message_id=100)]
+        result = generate_digest(
+            "2025-06-15", "2025-06-15T00:00:00",
+            database_path=seeded_db, bot_token="tok", chat_id="cid",
+            api_key="test-key", model="test-model",
+        )
+        assert result.digest_record["summary_en"] == "English summary"
+        assert result.digest_record["summary_zh"] == "中文摘要"
+        # Verify persisted to database
+        with get_connection(seeded_db) as conn:
+            row = conn.execute(
+                "SELECT summary_en, summary_zh FROM digests WHERE id = ?",
+                (result.digest_record["id"],),
+            ).fetchone()
+        assert row["summary_en"] == "English summary"
+        assert row["summary_zh"] == "中文摘要"
+
+    @patch("worldlines.digest.summarizer.generate_digest_summary")
+    @patch("worldlines.digest.digest.send_messages")
+    def test_summarizer_failure_does_not_block(self, mock_send, mock_summarizer, seeded_db):
+        mock_summarizer.return_value = MagicMock(
+            error="api_error: timeout", summary_en=None, summary_zh=None,
+        )
+        mock_send.return_value = [SendResult(ok=True, message_id=100)]
+        result = generate_digest(
+            "2025-06-15", "2025-06-15T00:00:00",
+            database_path=seeded_db, bot_token="tok", chat_id="cid",
+            api_key="test-key", model="test-model",
+        )
+        assert result.delivery_status == "sent"
+        assert result.digest_record is not None
+        assert result.digest_record["summary_en"] is None
+        assert result.digest_record["summary_zh"] is None
+
+    @patch("worldlines.digest.summarizer.generate_digest_summary")
+    @patch("worldlines.digest.digest.send_messages")
+    def test_summarizer_skipped_on_empty_day(self, mock_send, mock_summarizer, db_path):
+        mock_send.return_value = [SendResult(ok=True, message_id=101)]
+        generate_digest(
+            "2025-06-15", "2025-06-15T00:00:00",
+            database_path=db_path, bot_token="tok", chat_id="cid",
+            api_key="test-key", model="test-model",
+        )
+        mock_summarizer.assert_not_called()

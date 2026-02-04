@@ -118,6 +118,8 @@ def run_digest(config: Config) -> None:
         database_path=config.database_path,
         bot_token=config.telegram_bot_token,
         chat_id=config.telegram_chat_id,
+        api_key=config.llm_api_key,
+        model=config.llm_model,
         parse_mode=config.telegram_parse_mode,
         max_items=config.digest_max_items,
         max_retries=config.telegram_max_retries,
