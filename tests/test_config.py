@@ -24,6 +24,8 @@ def _clean_env(monkeypatch):
     for key in ("DATABASE_PATH", "ANALYSIS_VERSION", "MAX_ITEMS_PER_SOURCE",
                 "SOURCES_CONFIG_PATH", "LOG_LEVEL", "LOG_FORMAT", "APP_ENV"):
         monkeypatch.delenv(key, raising=False)
+    # Prevent .env file from re-setting variables during tests
+    monkeypatch.setattr("worldlines.config.load_dotenv", lambda *a, **kw: None)
 
 
 def test_missing_required_vars_raises(monkeypatch):
