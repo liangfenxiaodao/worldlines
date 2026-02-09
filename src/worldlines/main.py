@@ -5,6 +5,7 @@ from __future__ import annotations
 import json
 import logging
 import sys
+import threading
 from contextlib import asynccontextmanager
 
 import uvicorn
@@ -96,19 +97,22 @@ def main() -> None:
 
     init_db(config.database_path)
 
-    # Run pipeline once at startup (non-fatal — scheduler must start regardless)
-    logger.info("Running initial pipeline")
-    try:
-        run_pipeline(config)
-    except Exception:
-        logger.exception("Initial pipeline failed; scheduler will continue")
-
     scheduler = _build_scheduler(config)
+
+    def _initial_pipeline():
+        """Run pipeline once at startup in a background thread."""
+        logger.info("Running initial pipeline")
+        try:
+            run_pipeline(config)
+        except Exception:
+            logger.exception("Initial pipeline failed; scheduler will continue")
 
     @asynccontextmanager
     async def lifespan(app):
         logger.info("Scheduler starting")
         scheduler.start()
+        # Run initial pipeline in background so web server is available immediately
+        threading.Thread(target=_initial_pipeline, daemon=True).start()
         yield
         logger.info("Scheduler shutting down")
         scheduler.shutdown(wait=False)
