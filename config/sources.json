@@ -38,6 +38,31 @@
           "url": "https://www.technologyreview.com/feed/",
           "source_name": "MIT Technology Review",
           "source_type": "research"
+        },
+        {
+          "url": "https://www.federalreserve.gov/feeds/press_monetary.xml",
+          "source_name": "Federal Reserve Monetary Policy",
+          "source_type": "government"
+        },
+        {
+          "url": "https://www.federalreserve.gov/feeds/feds_notes.xml",
+          "source_name": "Fed Notes",
+          "source_type": "research"
+        },
+        {
+          "url": "https://fredblog.stlouisfed.org/feed/",
+          "source_name": "FRED Blog",
+          "source_type": "government"
+        },
+        {
+          "url": "https://www.bis.org/doclist/cbspeeches.rss",
+          "source_name": "BIS Central Bank Speeches",
+          "source_type": "government"
+        },
+        {
+          "url": "https://cepr.org/rss/vox-content",
+          "source_name": "VoxEU",
+          "source_type": "research"
         }
       ]
     }
