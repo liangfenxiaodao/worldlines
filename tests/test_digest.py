@@ -231,36 +231,36 @@ class TestRenderDigestHtml:
         assert "2025-06-15" in html
         assert "5 items analyzed" in html
 
-    def test_contains_dimension_breakdown(self):
+    def test_no_dimension_breakdown_in_telegram(self):
         html = render_digest_html(self._make_data())
-        assert "Compute & Computational Paradigms: 3" in html
-        assert "Governance, Regulation & Societal Response: 2" in html
+        assert "Dimension Breakdown" not in html
 
-    def test_contains_change_types(self):
+    def test_no_change_types_in_telegram(self):
         html = render_digest_html(self._make_data())
-        assert "Reinforcing: 3" in html
-        assert "Friction: 2" in html
+        assert "Change Types" not in html
 
-    def test_contains_items(self):
+    def test_contains_items_title_only(self):
         html = render_digest_html(self._make_data())
         assert "AI Chip Breakthrough" in html
-        assert "reinforcing | medium_term | high" in html
-        assert "New chip architecture improves efficiency." in html
+        # Metadata, summary, and dimensions should NOT appear
+        assert "reinforcing | medium_term | high" not in html
+        assert "New chip architecture improves efficiency." not in html
+        assert "Compute &amp; Computational Paradigms" not in html
 
     def test_html_escaping(self):
         html = render_digest_html(self._make_data())
         # Title with angle brackets should be escaped
         assert "EU &lt;AI&gt; Act" in html
 
-    def test_source_link_present(self):
+    def test_item_with_link_rendered_inline(self):
         html = render_digest_html(self._make_data())
-        assert '<a href="https://example.com/1">Source</a>' in html
+        assert '<a href="https://example.com/1">AI Chip Breakthrough</a>' in html
 
-    def test_no_source_link_when_none(self):
+    def test_item_without_link_rendered_plain(self):
         html = render_digest_html(self._make_data())
-        # Second item has no link — should not have a Source line for it
-        # Count Source links — should be exactly 1
-        assert html.count(">Source</a>") == 1
+        # Second item has no link — rendered as plain text
+        assert "EU &lt;AI&gt; Act" in html
+        assert html.count("https://example.com/1") == 1  # only first item's link
 
     def test_contains_summary_section(self):
         result = render_digest_html(
@@ -272,15 +272,15 @@ class TestRenderDigestHtml:
         assert "Today saw major shifts in compute." in result
         assert "今天计算领域发生了重大变化。" in result
 
-    def test_summary_before_dimension_breakdown(self):
+    def test_summary_before_key_items(self):
         result = render_digest_html(
             self._make_data(),
             summary_en="English summary here.",
             summary_zh="中文摘要。",
         )
         summary_pos = result.index("<b>Summary</b>")
-        dimension_pos = result.index("<b>Dimension Breakdown</b>")
-        assert summary_pos < dimension_pos
+        items_pos = result.index("<b>Key Items</b>")
+        assert summary_pos < items_pos
 
     def test_no_summary_section_when_none(self):
         result = render_digest_html(self._make_data())

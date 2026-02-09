@@ -52,36 +52,18 @@ def render_digest_html(
             lines.append(html.escape(summary_zh))
         lines.append("")
 
-    # Dimension breakdown
-    lines.append("<b>Dimension Breakdown</b>")
-    for dim_key, count in data.dimension_breakdown.items():
-        label = DIMENSION_DISPLAY.get(dim_key, dim_key)
-        lines.append(f"  {label}: {count}")
-    lines.append("")
-
-    # Change type distribution
-    lines.append("<b>Change Types</b>")
-    parts = []
-    for ct_key, count in data.change_type_distribution.items():
-        label = CHANGE_TYPE_DISPLAY.get(ct_key, ct_key)
-        parts.append(f"{label}: {count}")
-    lines.append("  " + " | ".join(parts))
-    lines.append("")
-
     # Key items
     lines.append("<b>Key Items</b>")
     lines.append("")
     for idx, item in enumerate(data.items, start=1):
-        lines.append(f"{idx}. <b>{html.escape(item.title)}</b>")
-        lines.append(
-            f"   <i>{item.change_type} | {item.time_horizon} | {item.importance}</i>"
-        )
-        lines.append(f"   {html.escape(item.summary)}")
-        dim_labels = [DIMENSION_DISPLAY.get(d, d) for d in item.dimensions]
-        lines.append(f"   {', '.join(dim_labels)}")
+        title = html.escape(item.title)
         if item.canonical_link:
-            lines.append(f'   <a href="{html.escape(item.canonical_link)}">Source</a>')
-        lines.append("")
+            lines.append(
+                f'{idx}. <a href="{html.escape(item.canonical_link)}">{title}</a>'
+            )
+        else:
+            lines.append(f"{idx}. {title}")
+    lines.append("")
 
     return "\n".join(lines).rstrip()
 
