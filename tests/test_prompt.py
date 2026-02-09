@@ -171,10 +171,23 @@ class TestValidateOutput:
         errors = validate_output(_valid_output(summary="BULLISH development"))
         assert any("bullish" in e for e in errors)
 
-    def test_summary_forbidden_buy_sell_hold(self):
-        for term in ["buy", "sell", "hold"]:
+    def test_summary_forbidden_buy_sell(self):
+        for term in ["buy", "sell"]:
             errors = validate_output(_valid_output(summary=f"Analysts say {term} now."))
             assert any(term in e for e in errors), f"Expected error for '{term}'"
+
+    def test_summary_hold_is_allowed(self):
+        """'hold' is common in central bank context (e.g. 'hold rates') and not forbidden."""
+        errors = validate_output(_valid_output(summary="The Fed decides to hold rates steady."))
+        assert errors == []
+
+    def test_summary_forbidden_term_word_boundary(self):
+        """Forbidden terms use word-boundary matching, not substring."""
+        # "buyback" contains "buy" but should NOT trigger
+        assert validate_output(_valid_output(summary="The company announced a buyback.")) == []
+        # "buy" as standalone word should trigger
+        errors = validate_output(_valid_output(summary="Analysts recommend to buy shares."))
+        assert any("buy" in e for e in errors)
 
     def test_summary_forbidden_upside_downside(self):
         for term in ["upside", "downside", "outperform", "underperform"]:

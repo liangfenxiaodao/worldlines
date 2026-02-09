@@ -4,6 +4,7 @@ from __future__ import annotations
 
 import json
 import logging
+import re
 from dataclasses import dataclass
 
 import anthropic
@@ -13,9 +14,14 @@ from worldlines.digest.digest import DigestItem
 logger = logging.getLogger(__name__)
 
 FORBIDDEN_TERMS = frozenset({
-    "bullish", "bearish", "buy", "sell", "hold",
+    "bullish", "bearish", "buy", "sell",
     "upside", "downside", "outperform", "underperform",
 })
+
+_FORBIDDEN_PATTERNS = {
+    term: re.compile(rf"\b{term}\b", re.IGNORECASE)
+    for term in FORBIDDEN_TERMS
+}
 
 MAX_SUMMARY_CHARS = 1000
 
@@ -36,7 +42,7 @@ RULES:
 - Be factual and neutral
 - No predictions, opinions, recommendations, or directional language
 - No superlatives (breakthrough, revolutionary, game-changing) unless directly quoting
-- FORBIDDEN TERMS: bullish, bearish, buy, sell, hold, upside, downside, \
+- FORBIDDEN TERMS: bullish, bearish, buy, sell, upside, downside, \
 outperform, underperform
 - Each summary must be at most 800 characters
 - The English summary (summary_en) and Chinese summary (summary_zh) should \
@@ -94,9 +100,8 @@ def validate_summary(data: dict) -> list[str]:
                 f"{field} exceeds {MAX_SUMMARY_CHARS} characters ({len(value)})"
             )
         else:
-            value_lower = value.lower()
-            for term in FORBIDDEN_TERMS:
-                if term in value_lower:
+            for term, pattern in _FORBIDDEN_PATTERNS.items():
+                if pattern.search(value):
                     errors.append(f"{field} contains forbidden term '{term}'")
 
     return errors

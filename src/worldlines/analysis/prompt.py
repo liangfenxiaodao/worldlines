@@ -2,6 +2,8 @@
 
 from __future__ import annotations
 
+import re
+
 SYSTEM_PROMPT = """\
 You are a structural analyst for a long-term trend intelligence system called Worldlines.
 
@@ -24,8 +26,9 @@ updates without hardware relevance.
 
 2. capital_flows_and_business_models — Assign when the item is about where capital \
 is deployed at scale (capex, acquisitions, funding rounds >$100M), business model \
-shifts, return structure changes, incentive realignment, or capital allocation \
-priorities. Do NOT assign for routine earnings, routine funding rounds, or stock \
+shifts, return structure changes, incentive realignment, capital allocation \
+priorities, or monetary policy effects on capital costs and credit conditions. \
+Do NOT assign for routine earnings, routine funding rounds, or stock \
 price movements without structural cause.
 
 3. energy_resources_and_physical_constraints — Assign when the item is about energy \
@@ -41,10 +44,12 @@ impacts at scale. Do NOT assign for demos/prototypes without deployment evidence
 consumer adoption without enterprise relevance, or marketing claims without evidence.
 
 5. governance_regulation_and_societal_response — Assign when the item is about \
-legislation, regulation, executive orders, subsidies, tariffs, sanctions, regulatory \
-frameworks, social backlash with institutional consequences, or jurisdictional \
-divergence. Do NOT assign for opinion pieces without institutional action, political \
-rhetoric without policy movement, or individual lawsuits without sector-wide impact.
+legislation, regulation, executive orders, central bank decisions, monetary policy \
+(interest rate decisions, quantitative easing/tightening), subsidies, tariffs, \
+sanctions, regulatory frameworks, social backlash with institutional consequences, \
+or jurisdictional divergence. Do NOT assign for opinion pieces without institutional \
+action, political rhetoric without policy movement, or individual lawsuits without \
+sector-wide impact.
 
 RELEVANCE LEVELS:
 - primary: The item is centrally about this dimension. Remove it and the item loses its core meaning.
@@ -78,7 +83,7 @@ SUMMARY RULES:
 - Factual and neutral
 - No predictions, opinions, recommendations, or directional language
 - No superlatives (breakthrough, revolutionary, game-changing) unless directly quoting
-- FORBIDDEN TERMS: bullish, bearish, buy, sell, hold, upside, downside, outperform, underperform
+- FORBIDDEN TERMS: bullish, bearish, buy, sell, upside, downside, outperform, underperform
 
 KEY ENTITIES:
 - Extract companies (common names, not legal entities), technologies, government bodies, regions
@@ -129,9 +134,15 @@ VALID_TIME_HORIZONS = frozenset({"short_term", "medium_term", "long_term"})
 VALID_IMPORTANCE = frozenset({"low", "medium", "high"})
 
 FORBIDDEN_SUMMARY_TERMS = frozenset({
-    "bullish", "bearish", "buy", "sell", "hold",
+    "bullish", "bearish", "buy", "sell",
     "upside", "downside", "outperform", "underperform",
 })
+
+# Pre-compiled patterns for word-boundary matching of forbidden terms.
+_FORBIDDEN_PATTERNS = {
+    term: re.compile(rf"\b{term}\b", re.IGNORECASE)
+    for term in FORBIDDEN_SUMMARY_TERMS
+}
 
 
 def format_user_prompt(
@@ -200,9 +211,8 @@ def validate_output(data: dict) -> list[str]:
     elif len(summary) > 500:
         errors.append(f"summary exceeds 500 characters ({len(summary)})")
     else:
-        summary_lower = summary.lower()
-        for term in FORBIDDEN_SUMMARY_TERMS:
-            if term in summary_lower:
+        for term, pattern in _FORBIDDEN_PATTERNS.items():
+            if pattern.search(summary):
                 errors.append(f"summary contains forbidden term '{term}'")
 
     # importance
