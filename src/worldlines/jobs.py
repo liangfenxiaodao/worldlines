@@ -109,7 +109,6 @@ def run_analysis(config: Config) -> None:
     items_found = 0
     analyzed = 0
     errors = 0
-    skipped = 0
 
     try:
         with get_connection(config.database_path) as conn:
