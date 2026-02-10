@@ -141,6 +141,14 @@ CREATE INDEX IF NOT EXISTS idx_temporal_links_link_type ON temporal_links(link_t
 -- Indexes: pipeline_runs
 CREATE INDEX IF NOT EXISTS idx_pipeline_runs_started_at ON pipeline_runs(started_at);
 CREATE INDEX IF NOT EXISTS idx_pipeline_runs_run_type ON pipeline_runs(run_type);
+
+-- Track classification failures to avoid infinite retries
+CREATE TABLE IF NOT EXISTS analysis_errors (
+    item_id             TEXT PRIMARY KEY REFERENCES items(id),
+    attempt_count       INTEGER NOT NULL DEFAULT 1,
+    last_error          TEXT NOT NULL,
+    last_attempted_at   TEXT NOT NULL
+);
 """
 
 

@@ -88,6 +88,16 @@ def classify_item(
             error={"code": "parse_error", "message": str(exc)},
         )
 
+    # Auto-promote: if dimensions exist but none is primary, promote the first
+    dims = data.get("dimensions")
+    if isinstance(dims, list) and len(dims) > 0:
+        has_primary = any(
+            isinstance(d, dict) and d.get("relevance") == "primary" for d in dims
+        )
+        if not has_primary:
+            dims[0]["relevance"] = "primary"
+            logger.info("Auto-promoted first dimension to primary for item %s", item.id)
+
     # Validate
     errors = validate_output(data)
     if errors:

@@ -86,6 +86,22 @@ def run_ingestion(config: Config) -> None:
     )
 
 
+_MAX_CLASSIFICATION_ATTEMPTS = 3
+
+
+def _record_analysis_error(database_path: str, item_id: str, error_msg: str) -> None:
+    """Upsert an error record for a failed classification attempt."""
+    now = datetime.now(timezone.utc).isoformat()
+    with get_connection(database_path) as conn:
+        conn.execute(
+            "INSERT INTO analysis_errors (item_id, attempt_count, last_error, last_attempted_at) "
+            "VALUES (?, 1, ?, ?) "
+            "ON CONFLICT(item_id) DO UPDATE SET "
+            "attempt_count = attempt_count + 1, last_error = ?, last_attempted_at = ?",
+            (item_id, error_msg, now, error_msg, now),
+        )
+
+
 def run_analysis(config: Config) -> None:
     """Find unanalyzed items and classify each with the LLM."""
     started_at = datetime.now(timezone.utc).isoformat()
@@ -93,6 +109,7 @@ def run_analysis(config: Config) -> None:
     items_found = 0
     analyzed = 0
     errors = 0
+    skipped = 0
 
     try:
         with get_connection(config.database_path) as conn:
@@ -101,8 +118,11 @@ def run_analysis(config: Config) -> None:
                 "i.timestamp, i.content, i.canonical_link, i.ingested_at, i.dedup_hash "
                 "FROM items i "
                 "LEFT JOIN analyses a ON i.id = a.item_id "
+                "LEFT JOIN analysis_errors ae ON i.id = ae.item_id "
                 "WHERE a.id IS NULL "
-                "ORDER BY i.ingested_at ASC"
+                "AND (ae.attempt_count IS NULL OR ae.attempt_count < ?) "
+                "ORDER BY i.ingested_at ASC",
+                (_MAX_CLASSIFICATION_ATTEMPTS,),
             ).fetchall()
 
         items_found = len(rows)
@@ -137,6 +157,9 @@ def run_analysis(config: Config) -> None:
                     )
                     if result.error:
                         errors += 1
+                        _record_analysis_error(
+                            config.database_path, item.id, result.error.get("message", "")
+                        )
                         logger.warning(
                             "Classification error for item %s: %s", item.id, result.error
                         )
@@ -144,6 +167,7 @@ def run_analysis(config: Config) -> None:
                         analyzed += 1
                 except Exception:
                     errors += 1
+                    _record_analysis_error(config.database_path, item.id, "unexpected error")
                     logger.exception("Unexpected error classifying item %s", item.id)
 
             logger.info("Analysis complete: %d analyzed, %d errors", analyzed, errors)
