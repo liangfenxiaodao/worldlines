@@ -182,9 +182,9 @@ class TestValidationError:
         assert "non-empty" in result.error
 
     @patch("worldlines.digest.summarizer._call_llm")
-    def test_summary_too_long(self, mock_llm):
+    def test_summary_too_long_is_truncated(self, mock_llm):
         mock_llm.return_value = json.dumps({
-            "summary_en": "x" * 1001,
+            "summary_en": "word " * 500,  # ~2500 chars, exceeds MAX_SUMMARY_CHARS
             "summary_zh": "valid text",
         })
         result = generate_digest_summary(
@@ -192,8 +192,10 @@ class TestValidationError:
             api_key="test-key",
             model="test-model",
         )
-        assert result.error is not None
-        assert "1000" in result.error
+        assert result.error is None
+        assert result.summary_en is not None
+        assert result.summary_en.endswith("…")
+        assert len(result.summary_en) <= 2001  # MAX_SUMMARY_CHARS + ellipsis
 
     @patch("worldlines.digest.summarizer._call_llm")
     def test_forbidden_terms(self, mock_llm):
@@ -228,10 +230,10 @@ class TestValidateSummary:
 
     def test_exceeds_max_length(self):
         errors = validate_summary({
-            "summary_en": "x" * 1001,
+            "summary_en": "x" * 2001,
             "summary_zh": "ok",
         })
-        assert any("1000" in e for e in errors)
+        assert any("2000" in e for e in errors)
 
     def test_forbidden_term_detected(self):
         errors = validate_summary({

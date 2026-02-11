@@ -23,7 +23,7 @@ _FORBIDDEN_PATTERNS = {
     for term in FORBIDDEN_TERMS
 }
 
-MAX_SUMMARY_CHARS = 1000
+MAX_SUMMARY_CHARS = 2000
 
 SUMMARY_SYSTEM_PROMPT = """\
 You are a structural synthesis writer for a long-term trend intelligence system \
@@ -163,6 +163,16 @@ def generate_digest_summary(
             summary_en=None, summary_zh=None,
             error=f"parse_error: {exc}",
         )
+
+    # Truncate over-long summaries instead of rejecting
+    for field in ("summary_en", "summary_zh"):
+        value = data.get(field)
+        if isinstance(value, str) and len(value) > MAX_SUMMARY_CHARS:
+            logger.warning(
+                "Truncating %s from %d to %d characters",
+                field, len(value), MAX_SUMMARY_CHARS,
+            )
+            data[field] = value[:MAX_SUMMARY_CHARS].rsplit(" ", 1)[0] + "…"
 
     # Validate
     errors = validate_summary(data)
