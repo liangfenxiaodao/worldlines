@@ -63,6 +63,26 @@
           "url": "https://cepr.org/rss/vox-content",
           "source_name": "VoxEU",
           "source_type": "research"
+        },
+        {
+          "url": "https://www.sec.gov/news/pressreleases.rss",
+          "source_name": "SEC Press Releases",
+          "source_type": "government"
+        },
+        {
+          "url": "https://www.sec.gov/enforcement-litigation/litigation-releases/rss",
+          "source_name": "SEC Litigation Releases",
+          "source_type": "government"
+        },
+        {
+          "url": "https://www.bls.gov/feed/bls_latest.rss",
+          "source_name": "BLS Latest Releases",
+          "source_type": "government"
+        },
+        {
+          "url": "https://www.eia.gov/rss/press_rss.xml",
+          "source_name": "EIA Press Releases",
+          "source_type": "government"
         }
       ]
     }
