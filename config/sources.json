@@ -115,7 +115,7 @@
     {
       "type": "earnings",
       "enabled": true,
-      "tickers": ["NVDA", "AMD", "TSM", "MSFT", "GOOGL", "AMZN", "META", "NEE"],
+      "tickers": ["NVDA", "AMD", "MSFT", "GOOGL", "AMZN", "META"],
       "api_key_env": "FMP_API_KEY",
       "max_content_chars": 8000
     }
