@@ -83,8 +83,41 @@
           "url": "https://www.eia.gov/rss/press_rss.xml",
           "source_name": "EIA Press Releases",
           "source_type": "government"
+        },
+        {
+          "url": "https://rss.arxiv.org/rss/cs.AI",
+          "source_name": "arXiv cs.AI",
+          "source_type": "research"
+        },
+        {
+          "url": "https://rss.arxiv.org/rss/cs.DC",
+          "source_name": "arXiv cs.DC",
+          "source_type": "research"
+        },
+        {
+          "url": "https://rss.arxiv.org/rss/econ.GN",
+          "source_name": "arXiv econ.GN",
+          "source_type": "research"
+        },
+        {
+          "url": "https://rss.arxiv.org/rss/cs.CY",
+          "source_name": "arXiv cs.CY",
+          "source_type": "research"
         }
       ]
+    },
+    {
+      "type": "hn",
+      "enabled": true,
+      "min_score": 100,
+      "max_items": 30
+    },
+    {
+      "type": "earnings",
+      "enabled": true,
+      "tickers": ["NVDA", "AMD", "TSM", "MSFT", "GOOGL", "AMZN", "META", "NEE"],
+      "api_key_env": "FMP_API_KEY",
+      "max_content_chars": 8000
     }
   ]
 }

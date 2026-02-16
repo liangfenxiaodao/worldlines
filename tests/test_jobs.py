@@ -91,8 +91,8 @@ def _seed_analysis(conn, analysis_id, item_id):
 
 class TestRunIngestion:
     @patch("worldlines.jobs.ingest_item")
-    @patch("worldlines.jobs.RSSAdapter")
-    def test_fetches_and_ingests_items(self, MockAdapter, mock_ingest, tmp_path):
+    @patch("worldlines.jobs.get_adapter_class")
+    def test_fetches_and_ingests_items(self, mock_get_cls, mock_ingest, tmp_path):
         config = _make_config(tmp_path)
         init_db(config.database_path)
 
@@ -100,7 +100,8 @@ class TestRunIngestion:
         raw2 = MagicMock()
         adapter_instance = MagicMock()
         adapter_instance.fetch.return_value = [raw1, raw2]
-        MockAdapter.return_value = adapter_instance
+        MockAdapter = MagicMock(return_value=adapter_instance)
+        mock_get_cls.return_value = MockAdapter
 
         mock_ingest.return_value = NormalizationResult(
             status="new",
@@ -117,14 +118,15 @@ class TestRunIngestion:
         mock_ingest.assert_any_call(raw2, config.database_path)
 
     @patch("worldlines.jobs.ingest_item")
-    @patch("worldlines.jobs.RSSAdapter")
-    def test_counts_new_and_duplicates(self, MockAdapter, mock_ingest, tmp_path):
+    @patch("worldlines.jobs.get_adapter_class")
+    def test_counts_new_and_duplicates(self, mock_get_cls, mock_ingest, tmp_path):
         config = _make_config(tmp_path)
         init_db(config.database_path)
 
         adapter_instance = MagicMock()
         adapter_instance.fetch.return_value = [MagicMock(), MagicMock(), MagicMock()]
-        MockAdapter.return_value = adapter_instance
+        MockAdapter = MagicMock(return_value=adapter_instance)
+        mock_get_cls.return_value = MockAdapter
 
         mock_ingest.side_effect = [
             NormalizationResult(status="new", item=MagicMock(spec=NormalizedItem)),
@@ -141,8 +143,8 @@ class TestRunIngestion:
             )
 
     @patch("worldlines.jobs.ingest_item")
-    @patch("worldlines.jobs.RSSAdapter")
-    def test_skips_disabled_adapters(self, MockAdapter, mock_ingest, tmp_path):
+    @patch("worldlines.jobs.get_adapter_class")
+    def test_skips_disabled_adapters(self, mock_get_cls, mock_ingest, tmp_path):
         sources = {
             "adapters": [
                 {"type": "rss", "enabled": False, "feeds": [{"url": "http://x"}]}
@@ -151,14 +153,16 @@ class TestRunIngestion:
         config = _make_config(tmp_path, _sources=sources)
         init_db(config.database_path)
 
+        MockAdapter = MagicMock()
+        mock_get_cls.return_value = MockAdapter
+
         run_ingestion(config)
 
         MockAdapter.assert_not_called()
         mock_ingest.assert_not_called()
 
     @patch("worldlines.jobs.ingest_item")
-    @patch("worldlines.jobs.RSSAdapter")
-    def test_skips_non_rss_adapters(self, MockAdapter, mock_ingest, tmp_path):
+    def test_skips_unknown_adapter_types(self, mock_ingest, tmp_path):
         sources = {
             "adapters": [
                 {"type": "twitter", "enabled": True}
@@ -167,9 +171,13 @@ class TestRunIngestion:
         config = _make_config(tmp_path, _sources=sources)
         init_db(config.database_path)
 
-        run_ingestion(config)
+        with patch("worldlines.jobs.logger") as mock_logger:
+            run_ingestion(config)
+            mock_logger.warning.assert_any_call(
+                "Unknown adapter type '%s', skipping", "twitter"
+            )
 
-        MockAdapter.assert_not_called()
+        mock_ingest.assert_not_called()
 
 
 # --- TestRunAnalysis ---

@@ -12,8 +12,9 @@ from zoneinfo import ZoneInfo
 from worldlines.analysis.classifier import classify_item
 from worldlines.config import Config
 from worldlines.digest.digest import generate_digest
+import worldlines.ingestion  # noqa: F401  — triggers adapter registration
 from worldlines.ingestion.normalize import NormalizedItem, ingest_item
-from worldlines.ingestion.rss_adapter import RSSAdapter
+from worldlines.ingestion.registry import get_adapter_class
 from worldlines.storage.connection import get_connection
 
 logger = logging.getLogger(__name__)
@@ -58,12 +59,15 @@ def run_ingestion(config: Config) -> None:
             sources = json.load(f)
 
         for adapter_config in sources.get("adapters", []):
-            if adapter_config.get("type") != "rss":
+            adapter_type = adapter_config.get("type", "")
+            adapter_cls = get_adapter_class(adapter_type)
+            if adapter_cls is None:
+                logger.warning("Unknown adapter type '%s', skipping", adapter_type)
                 continue
             if not adapter_config.get("enabled", True):
                 continue
 
-            adapter = RSSAdapter(config.database_path, config.max_items_per_source)
+            adapter = adapter_cls(config.database_path, config.max_items_per_source)
             adapter.configure(adapter_config)
             raw_items = adapter.fetch()
 
