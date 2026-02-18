@@ -93,16 +93,6 @@
           "url": "https://rss.arxiv.org/rss/cs.DC",
           "source_name": "arXiv cs.DC",
           "source_type": "research"
-        },
-        {
-          "url": "https://rss.arxiv.org/rss/econ.GN",
-          "source_name": "arXiv econ.GN",
-          "source_type": "research"
-        },
-        {
-          "url": "https://rss.arxiv.org/rss/cs.CY",
-          "source_name": "arXiv cs.CY",
-          "source_type": "research"
         }
       ]
     },
@@ -110,7 +100,7 @@
       "type": "hn",
       "enabled": true,
       "min_score": 100,
-      "max_items": 30
+      "max_items": 15
     },
     {
       "type": "earnings",
