@@ -101,13 +101,6 @@
       "enabled": true,
       "min_score": 100,
       "max_items": 15
-    },
-    {
-      "type": "earnings",
-      "enabled": true,
-      "tickers": ["NVDA", "AMD", "MSFT", "GOOGL", "AMZN", "META"],
-      "api_key_env": "FMP_API_KEY",
-      "max_content_chars": 8000
     }
   ]
 }
