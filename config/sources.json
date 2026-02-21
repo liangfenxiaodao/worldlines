@@ -93,6 +93,31 @@
           "url": "https://rss.arxiv.org/rss/cs.DC",
           "source_name": "arXiv cs.DC",
           "source_type": "research"
+        },
+        {
+          "url": "https://www.reddit.com/r/technology/top.rss?t=day",
+          "source_name": "Reddit r/technology",
+          "source_type": "news"
+        },
+        {
+          "url": "https://www.reddit.com/r/MachineLearning/top.rss?t=day",
+          "source_name": "Reddit r/MachineLearning",
+          "source_type": "research"
+        },
+        {
+          "url": "https://www.reddit.com/r/programming/top.rss?t=day",
+          "source_name": "Reddit r/programming",
+          "source_type": "industry"
+        },
+        {
+          "url": "https://www.reddit.com/r/energy/top.rss?t=day",
+          "source_name": "Reddit r/energy",
+          "source_type": "industry"
+        },
+        {
+          "url": "https://www.reddit.com/r/economics/top.rss?t=day",
+          "source_name": "Reddit r/economics",
+          "source_type": "research"
         }
       ]
     },
@@ -101,17 +126,6 @@
       "enabled": true,
       "min_score": 100,
       "max_items": 15
-    },
-    {
-      "type": "reddit",
-      "enabled": true,
-      "subreddits": [
-        {"name": "technology", "source_type": "news", "min_score": 100},
-        {"name": "MachineLearning", "source_type": "research", "min_score": 50},
-        {"name": "programming", "source_type": "industry", "min_score": 100},
-        {"name": "energy", "source_type": "industry", "min_score": 50},
-        {"name": "economics", "source_type": "research", "min_score": 50}
-      ]
     },
     {
       "type": "github",
