@@ -8,7 +8,7 @@ from worldlines.ingestion.github_adapter import GitHubTrendingAdapter
 from worldlines.storage.schema import init_db
 
 
-def _make_repo(repo_id, name="owner/repo", description="A cool repo",
+def _make_repo(repo_id, name="owner/repo", description="A cool open source project for developers",
                language="Python", stars=1000, pushed_at="2026-02-15T10:00:00Z"):
     return {
         "id": repo_id,
@@ -41,8 +41,8 @@ class TestGitHubTrendingAdapter:
         adapter.configure({"languages": ["python"], "min_stars": 100, "max_items": 10})
 
         repos = [
-            _make_repo(1, "owner/repo1", "First repo", "Python", 2000),
-            _make_repo(2, "owner/repo2", "Second repo", "Python", 1500),
+            _make_repo(1, "owner/repo1", "A fast Python web framework for building APIs", "Python", 2000),
+            _make_repo(2, "owner/repo2", "Machine learning toolkit for data scientists", "Python", 1500),
         ]
 
         with patch("worldlines.ingestion.github_adapter.httpx.get", side_effect=_mock_get(repos)):
@@ -130,14 +130,14 @@ class TestGitHubTrendingAdapter:
         adapter = GitHubTrendingAdapter(db_path)
         adapter.configure({"languages": ["python"], "min_stars": 100, "max_items": 10})
 
-        repos = [_make_repo(1, "owner/repo1", "A cool project", "Python", 2000)]
+        repos = [_make_repo(1, "owner/repo1", "A high-performance web framework", "Python", 2000)]
 
         with patch("worldlines.ingestion.github_adapter.httpx.get", side_effect=_mock_get(repos)):
             result = adapter.fetch()
 
-        assert result[0].content == "A cool project | Python | 2000 stars"
+        assert result[0].content == "A high-performance web framework | Python | 2000 stars"
 
-    def test_missing_description(self, tmp_path):
+    def test_filters_missing_description(self, tmp_path):
         db_path = str(tmp_path / "test.db")
         init_db(db_path)
 
@@ -149,7 +149,21 @@ class TestGitHubTrendingAdapter:
         with patch("worldlines.ingestion.github_adapter.httpx.get", side_effect=_mock_get(repos)):
             result = adapter.fetch()
 
-        assert result[0].content == "No description | Rust | 500 stars"
+        assert len(result) == 0
+
+    def test_filters_short_description(self, tmp_path):
+        db_path = str(tmp_path / "test.db")
+        init_db(db_path)
+
+        adapter = GitHubTrendingAdapter(db_path)
+        adapter.configure({"languages": ["python"], "min_stars": 100, "max_items": 10})
+
+        repos = [_make_repo(1, "owner/repo1", "Too short", "Python", 500)]
+
+        with patch("worldlines.ingestion.github_adapter.httpx.get", side_effect=_mock_get(repos)):
+            result = adapter.fetch()
+
+        assert len(result) == 0
 
     def test_published_at_from_pushed_at(self, tmp_path):
         db_path = str(tmp_path / "test.db")
@@ -220,8 +234,8 @@ class TestGitHubTrendingAdapter:
         })
 
         repos = [
-            _make_repo(1, "owner/py-repo", "Python project", "Python", 2000),
-            _make_repo(2, "owner/rs-repo", "Rust project", "Rust", 1500),
+            _make_repo(1, "owner/py-repo", "A comprehensive Python data analysis library", "Python", 2000),
+            _make_repo(2, "owner/rs-repo", "High-performance Rust systems programming toolkit", "Rust", 1500),
         ]
 
         with patch("worldlines.ingestion.github_adapter.httpx.get", side_effect=_mock_get(repos)):

@@ -123,11 +123,11 @@ class GitHubTrendingAdapter(SourceAdapter):
                 continue
 
             full_name = repo.get("full_name", "")
-            description = repo.get("description") or "No description"
+            description = repo.get("description") or ""
             lang = repo.get("language") or "Unknown"
             stars = repo.get("stargazers_count", 0)
 
-            if not full_name.strip():
+            if not full_name.strip() or len(description) < 20:
                 seen_ids.add(repo_id)
                 continue
 
