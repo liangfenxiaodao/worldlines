@@ -63,6 +63,7 @@ class ItemSummary(BaseModel):
     time_horizon: str
     importance: str
     analyzed_at: str
+    eligible_for_exposure_mapping: bool
 
 
 class ItemListResponse(BaseModel):
@@ -95,6 +96,7 @@ class AnalysisDetail(BaseModel):
     key_entities: list[str]
     analyzed_at: str
     analysis_version: str
+    eligible_for_exposure_mapping: bool
 
 
 class ItemDetailResponse(BaseModel):

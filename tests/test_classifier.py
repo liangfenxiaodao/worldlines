@@ -9,6 +9,7 @@ import pytest
 
 from worldlines.analysis.classifier import (
     AnalysisResult,
+    check_exposure_eligibility,
     classify_item,
     _parse_json,
     _persist_analysis,
@@ -100,6 +101,67 @@ class TestParseJson:
     def test_raises_on_partial_json(self):
         with pytest.raises(ValueError, match="Invalid JSON"):
             _parse_json('{"key": ')
+
+
+# --- Exposure eligibility ---
+
+
+class TestCheckExposureEligibility:
+    def test_eligible_medium_importance_with_primary(self):
+        data = {
+            "importance": "medium",
+            "dimensions": [
+                {"dimension": "compute_and_computational_paradigms", "relevance": "primary"},
+            ],
+        }
+        assert check_exposure_eligibility(data) is True
+
+    def test_eligible_high_importance_with_primary(self):
+        data = {
+            "importance": "high",
+            "dimensions": [
+                {"dimension": "capital_flows_and_business_models", "relevance": "primary"},
+                {"dimension": "energy_resources_and_physical_constraints", "relevance": "secondary"},
+            ],
+        }
+        assert check_exposure_eligibility(data) is True
+
+    def test_ineligible_low_importance(self):
+        data = {
+            "importance": "low",
+            "dimensions": [
+                {"dimension": "compute_and_computational_paradigms", "relevance": "primary"},
+            ],
+        }
+        assert check_exposure_eligibility(data) is False
+
+    def test_ineligible_no_primary_dimension(self):
+        data = {
+            "importance": "high",
+            "dimensions": [
+                {"dimension": "compute_and_computational_paradigms", "relevance": "secondary"},
+            ],
+        }
+        assert check_exposure_eligibility(data) is False
+
+    def test_ineligible_empty_dimensions(self):
+        data = {
+            "importance": "medium",
+            "dimensions": [],
+        }
+        assert check_exposure_eligibility(data) is False
+
+    def test_ineligible_missing_importance(self):
+        data = {
+            "dimensions": [
+                {"dimension": "compute_and_computational_paradigms", "relevance": "primary"},
+            ],
+        }
+        assert check_exposure_eligibility(data) is False
+
+    def test_ineligible_missing_dimensions(self):
+        data = {"importance": "high"}
+        assert check_exposure_eligibility(data) is False
 
 
 # --- Persistence ---
@@ -286,3 +348,53 @@ class TestClassifyItem:
         )
         assert result.analysis is not None
         assert result.error is None
+
+    @patch("worldlines.analysis.classifier._call_llm", side_effect=_mock_call_llm)
+    def test_eligible_for_exposure_mapping_set_true(self, mock_llm, db_path):
+        # VALID_LLM_RESPONSE has importance=medium + primary dimension → eligible
+        result = classify_item(
+            _make_item(),
+            api_key="test-key",
+            model="test-model",
+            analysis_version="v1",
+            database_path=db_path,
+        )
+        assert result.analysis["eligible_for_exposure_mapping"] is True
+
+    @patch("worldlines.analysis.classifier._call_llm")
+    def test_eligible_for_exposure_mapping_set_false(self, mock_llm, db_path):
+        low_importance = json.dumps({
+            "dimensions": [
+                {"dimension": "compute_and_computational_paradigms", "relevance": "primary"},
+            ],
+            "change_type": "reinforcing",
+            "time_horizon": "medium_term",
+            "summary": "A low-importance observation about chip production.",
+            "importance": "low",
+            "key_entities": ["TSMC"],
+        })
+        mock_llm.return_value = low_importance
+        result = classify_item(
+            _make_item(),
+            api_key="test-key",
+            model="test-model",
+            analysis_version="v1",
+            database_path=db_path,
+        )
+        assert result.analysis["eligible_for_exposure_mapping"] is False
+
+    @patch("worldlines.analysis.classifier._call_llm", side_effect=_mock_call_llm)
+    def test_eligible_for_exposure_mapping_persisted(self, mock_llm, db_path):
+        result = classify_item(
+            _make_item(),
+            api_key="test-key",
+            model="test-model",
+            analysis_version="v1",
+            database_path=db_path,
+        )
+        with get_connection(db_path) as conn:
+            row = conn.execute(
+                "SELECT eligible_for_exposure_mapping FROM analyses WHERE id = ?",
+                (result.analysis["id"],),
+            ).fetchone()
+        assert row["eligible_for_exposure_mapping"] == 1

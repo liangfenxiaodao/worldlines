@@ -21,6 +21,22 @@ from worldlines.storage.connection import get_connection
 logger = logging.getLogger(__name__)
 
 
+def check_exposure_eligibility(data: dict) -> bool:
+    """Return True when an analysis meets the bar for exposure mapping.
+
+    Criteria: importance is medium or high AND at least one dimension
+    has relevance == "primary".
+    """
+    if data.get("importance") not in ("medium", "high"):
+        return False
+    dims = data.get("dimensions")
+    if not isinstance(dims, list):
+        return False
+    return any(
+        isinstance(d, dict) and d.get("relevance") == "primary" for d in dims
+    )
+
+
 @dataclass(frozen=True)
 class AnalysisResult:
     """Result of the classification pipeline."""
@@ -112,6 +128,7 @@ def classify_item(
     # Build analysis record
     analysis_id = str(uuid.uuid4())
     now = datetime.now(timezone.utc).isoformat()
+    eligible = check_exposure_eligibility(data)
 
     analysis = {
         "id": analysis_id,
@@ -124,6 +141,7 @@ def classify_item(
         "key_entities": data["key_entities"],
         "analyzed_at": now,
         "analysis_version": analysis_version,
+        "eligible_for_exposure_mapping": eligible,
     }
 
     # Persist
@@ -183,8 +201,9 @@ def _persist_analysis(analysis: dict, database_path: str) -> None:
         conn.execute(
             "INSERT INTO analyses "
             "(id, item_id, dimensions, change_type, time_horizon, summary, "
-            "importance, key_entities, analyzed_at, analysis_version) "
-            "VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)",
+            "importance, key_entities, analyzed_at, analysis_version, "
+            "eligible_for_exposure_mapping) "
+            "VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)",
             (
                 analysis["id"],
                 analysis["item_id"],
@@ -196,5 +215,6 @@ def _persist_analysis(analysis: dict, database_path: str) -> None:
                 json.dumps(analysis["key_entities"]),
                 analysis["analyzed_at"],
                 analysis["analysis_version"],
+                int(analysis.get("eligible_for_exposure_mapping", False)),
             ),
         )

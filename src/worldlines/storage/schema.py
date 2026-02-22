@@ -44,7 +44,8 @@ CREATE TABLE IF NOT EXISTS analyses (
                         )),
     key_entities        TEXT NOT NULL,          -- JSON array
     analyzed_at         TEXT NOT NULL,
-    analysis_version    TEXT NOT NULL
+    analysis_version    TEXT NOT NULL,
+    eligible_for_exposure_mapping INTEGER NOT NULL DEFAULT 0
 );
 
 -- Structural exposure records mapping analyses to instruments
@@ -191,10 +192,32 @@ def _migrate_pipeline_runs_add_backup(conn: sqlite3.Connection) -> None:
         """)
 
 
+def _migrate_analyses_add_eligibility(conn: sqlite3.Connection) -> None:
+    """Add eligible_for_exposure_mapping column to existing analyses table and backfill."""
+    try:
+        conn.execute(
+            "ALTER TABLE analyses ADD COLUMN "
+            "eligible_for_exposure_mapping INTEGER NOT NULL DEFAULT 0"
+        )
+    except sqlite3.OperationalError:
+        return  # Column already exists
+
+    # Backfill: eligible when importance is medium/high AND has a primary dimension
+    conn.execute(
+        "UPDATE analyses SET eligible_for_exposure_mapping = 1 "
+        "WHERE importance IN ('medium', 'high') "
+        "AND EXISTS ("
+        "  SELECT 1 FROM json_each(analyses.dimensions) "
+        "  WHERE json_extract(value, '$.relevance') = 'primary'"
+        ")"
+    )
+
+
 def init_db(database_path: str) -> None:
     """Create all tables and indexes if they do not already exist."""
     with get_connection(database_path) as conn:
         conn.executescript(_SCHEMA_SQL)
         _migrate_digests_summary(conn)
         _migrate_pipeline_runs_add_backup(conn)
+        _migrate_analyses_add_eligibility(conn)
     logger.info("Database initialized at %s", database_path)

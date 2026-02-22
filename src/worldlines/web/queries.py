@@ -197,7 +197,7 @@ def list_items(
             f"i.canonical_link, i.ingested_at, "
             f"a.id AS analysis_id, a.dimensions, a.change_type, a.time_horizon, "
             f"a.summary, a.importance, a.key_entities, a.analyzed_at, "
-            f"a.analysis_version "
+            f"a.analysis_version, a.eligible_for_exposure_mapping "
             f"{base_from} {where_clause} "
             f"ORDER BY {sort_expr} {order} "
             f"LIMIT ? OFFSET ?"
@@ -223,6 +223,7 @@ def list_items(
             "key_entities": json.loads(r["key_entities"]),
             "analyzed_at": r["analyzed_at"],
             "analysis_version": r["analysis_version"],
+            "eligible_for_exposure_mapping": bool(r["eligible_for_exposure_mapping"]),
         })
 
     return items, total
@@ -238,7 +239,7 @@ def get_item_by_id(database_path: str, item_id: str) -> dict | None:
             "SELECT i.*, "
             "a.id AS analysis_id, a.dimensions, a.change_type, a.time_horizon, "
             "a.summary, a.importance, a.key_entities, a.analyzed_at, "
-            "a.analysis_version "
+            "a.analysis_version, a.eligible_for_exposure_mapping "
             "FROM items i LEFT JOIN analyses a ON a.item_id = i.id "
             "WHERE i.id = ?",
             (item_id,),
@@ -271,6 +272,7 @@ def get_item_by_id(database_path: str, item_id: str) -> dict | None:
             "key_entities": json.loads(row["key_entities"]),
             "analyzed_at": row["analyzed_at"],
             "analysis_version": row["analysis_version"],
+            "eligible_for_exposure_mapping": bool(row["eligible_for_exposure_mapping"]),
         }
 
     return {"item": item, "analysis": analysis}

@@ -59,13 +59,25 @@ def _seed_analysis(conn, analysis_id, item_id, **overrides):
         "key_entities": ["TestEntity"],
         "analyzed_at": "2025-06-15T10:00:00+00:00",
         "analysis_version": "v1",
+        "eligible_for_exposure_mapping": 0,
     }
     defaults.update(overrides)
+    # Compute eligibility if not explicitly provided in overrides
+    if "eligible_for_exposure_mapping" not in overrides:
+        importance = defaults["importance"]
+        dims = defaults["dimensions"]
+        has_primary = any(
+            isinstance(d, dict) and d.get("relevance") == "primary" for d in dims
+        )
+        defaults["eligible_for_exposure_mapping"] = int(
+            importance in ("medium", "high") and has_primary
+        )
     conn.execute(
         "INSERT INTO analyses "
         "(id, item_id, dimensions, change_type, time_horizon, summary, "
-        "importance, key_entities, analyzed_at, analysis_version) "
-        "VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)",
+        "importance, key_entities, analyzed_at, analysis_version, "
+        "eligible_for_exposure_mapping) "
+        "VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)",
         (
             analysis_id,
             item_id,
@@ -77,6 +89,7 @@ def _seed_analysis(conn, analysis_id, item_id, **overrides):
             json.dumps(defaults["key_entities"]),
             defaults["analyzed_at"],
             defaults["analysis_version"],
+            defaults["eligible_for_exposure_mapping"],
         ),
     )
 
@@ -376,6 +389,28 @@ class TestItems:
     def test_get_item_by_id_not_found(self, client):
         resp = client.get("/api/v1/items/nonexistent")
         assert resp.status_code == 404
+
+    def test_list_items_includes_eligibility_flag(self, client):
+        data = client.get("/api/v1/items").json()
+        for item in data["items"]:
+            assert "eligible_for_exposure_mapping" in item
+            assert isinstance(item["eligible_for_exposure_mapping"], bool)
+
+    def test_item_detail_includes_eligibility_flag(self, client):
+        resp = client.get("/api/v1/items/item-1")
+        assert resp.status_code == 200
+        analysis = resp.json()["analysis"]
+        assert "eligible_for_exposure_mapping" in analysis
+        assert isinstance(analysis["eligible_for_exposure_mapping"], bool)
+
+    def test_eligibility_matches_criteria(self, client):
+        data = client.get("/api/v1/items").json()
+        for item in data["items"]:
+            has_primary = any(
+                d.get("relevance") == "primary" for d in item["dimensions"]
+            )
+            expected = item["importance"] in ("medium", "high") and has_primary
+            assert item["eligible_for_exposure_mapping"] == expected
 
 
 # --- Tests: Edge Cases ---

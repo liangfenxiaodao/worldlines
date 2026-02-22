@@ -34,7 +34,19 @@
       "Bash(.venv/bin/pytest:*)",
       "Bash(.venv/bin/ruff check:*)",
       "Bash(DATABASE_PATH=./test_entry.db LLM_API_KEY=x LLM_MODEL=x TELEGRAM_BOT_TOKEN=x TELEGRAM_CHAT_ID=x .venv/bin/worldlines:*)",
-      "Bash(git commit:*)"
+      "Bash(git commit:*)",
+      "Bash(git push:*)",
+      "Bash(~/.fly/bin/flyctl secrets list -a worldlines)",
+      "Bash(~/.fly/bin/flyctl status:*)",
+      "Bash(~/.fly/bin/flyctl logs:*)",
+      "Bash(~/.fly/bin/flyctl secrets unset:*)",
+      "Bash(gh run list:*)",
+      "Bash(gh issue delete:*)",
+      "Bash(git -C /Users/jackyli/projects/worldlines diff --stat)",
+      "Bash(git -C /Users/jackyli/projects/worldlines log --oneline -5)",
+      "Bash(git -C /Users/jackyli/projects/worldlines add fly.toml src/worldlines/config.py src/worldlines/jobs.py src/worldlines/main.py src/worldlines/storage/schema.py src/worldlines/web/app.py src/worldlines/web/main.py src/worldlines/web/routes.py tests/test_jobs.py tests/test_backup.py tests/test_health.py)",
+      "Bash(git -C /Users/jackyli/projects/worldlines commit -m \"$\\(cat <<''EOF''\nAdd monitoring, backups, and failure alerts \\(#24\\)\n\n- Health check endpoint at /health with DB connectivity test and fly.toml config\n- Telegram alerts on ingestion/analysis/digest pipeline failures\n- Automated daily SQLite backups with configurable retention\n- Unified web logging to avoid duplicate handler setup\n\nCo-Authored-By: Claude Opus 4.6 <noreply@anthropic.com>\nEOF\n\\)\")",
+      "Bash(git -C /Users/jackyli/projects/worldlines push)"
     ]
   }
 }
