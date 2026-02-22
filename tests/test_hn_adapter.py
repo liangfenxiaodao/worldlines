@@ -8,7 +8,8 @@ from worldlines.ingestion.hn_adapter import HNAdapter
 from worldlines.storage.schema import init_db
 
 
-def _make_hn_item(story_id, title="Test Story", score=150, item_type="story", url=None, time_val=1700000000):
+def _make_hn_item(story_id, title="Test Story", score=150, item_type="story",
+                  url=None, time_val=1700000000, descendants=10):
     return {
         "id": story_id,
         "type": item_type,
@@ -16,6 +17,7 @@ def _make_hn_item(story_id, title="Test Story", score=150, item_type="story", ur
         "score": score,
         "url": url or f"https://example.com/{story_id}",
         "time": time_val,
+        "descendants": descendants,
     }
 
 
@@ -204,3 +206,45 @@ class TestHNAdapter:
         assert item.source_name == "Hacker News"
         assert item.source_type == "news"
         assert item.published_at is not None
+
+    def test_content_includes_score_and_comments(self, tmp_path):
+        db_path = str(tmp_path / "test.db")
+        init_db(db_path)
+
+        adapter = HNAdapter(db_path)
+        adapter.configure({"min_score": 0, "max_items": 10})
+
+        items_by_id = {
+            1: _make_hn_item(1, "Show HN: Cool Project", score=250,
+                             url="https://example.com/project", descendants=42),
+        }
+
+        with patch("worldlines.ingestion.hn_adapter.httpx.get", side_effect=_mock_get([1], items_by_id)):
+            with patch("worldlines.ingestion.hn_adapter.time.sleep"):
+                result = adapter.fetch()
+
+        assert len(result) == 1
+        assert result[0].content == "Show HN: Cool Project | 250 points, 42 comments | example.com"
+
+    def test_content_without_url_has_no_domain(self, tmp_path):
+        db_path = str(tmp_path / "test.db")
+        init_db(db_path)
+
+        adapter = HNAdapter(db_path)
+        adapter.configure({"min_score": 0, "max_items": 10})
+
+        # Story with no external URL (Ask HN, etc.)
+        items_by_id = {
+            1: {
+                "id": 1, "type": "story", "title": "Ask HN: Something",
+                "score": 200, "time": 1700000000, "descendants": 5,
+            },
+        }
+
+        with patch("worldlines.ingestion.hn_adapter.httpx.get", side_effect=_mock_get([1], items_by_id)):
+            with patch("worldlines.ingestion.hn_adapter.time.sleep"):
+                result = adapter.fetch()
+
+        assert len(result) == 1
+        assert result[0].content == "Ask HN: Something | 200 points, 5 comments"
+        assert "| " not in result[0].content.split("comments")[1] if "comments" in result[0].content else True

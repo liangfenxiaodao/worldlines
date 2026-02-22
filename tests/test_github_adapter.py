@@ -9,7 +9,7 @@ from worldlines.storage.schema import init_db
 
 
 def _make_repo(repo_id, name="owner/repo", description="A cool open source project for developers",
-               language="Python", stars=1000, pushed_at="2026-02-15T10:00:00Z"):
+               language="Python", stars=1000, pushed_at="2026-02-15T10:00:00Z", topics=None):
     return {
         "id": repo_id,
         "full_name": name,
@@ -18,6 +18,7 @@ def _make_repo(repo_id, name="owner/repo", description="A cool open source proje
         "stargazers_count": stars,
         "html_url": f"https://github.com/{name}",
         "pushed_at": pushed_at,
+        "topics": topics,
     }
 
 
@@ -136,6 +137,41 @@ class TestGitHubTrendingAdapter:
             result = adapter.fetch()
 
         assert result[0].content == "A high-performance web framework | Python | 2000 stars"
+
+    def test_content_includes_topics(self, tmp_path):
+        db_path = str(tmp_path / "test.db")
+        init_db(db_path)
+
+        adapter = GitHubTrendingAdapter(db_path)
+        adapter.configure({"languages": ["python"], "min_stars": 100, "max_items": 10})
+
+        repos = [_make_repo(
+            1, "owner/repo1", "A high-performance web framework", "Python", 2000,
+            topics=["web", "api", "async"],
+        )]
+
+        with patch("worldlines.ingestion.github_adapter.httpx.get", side_effect=_mock_get(repos)):
+            result = adapter.fetch()
+
+        assert result[0].content == "A high-performance web framework | Python | 2000 stars | Topics: web, api, async"
+
+    def test_content_limits_topics_to_five(self, tmp_path):
+        db_path = str(tmp_path / "test.db")
+        init_db(db_path)
+
+        adapter = GitHubTrendingAdapter(db_path)
+        adapter.configure({"languages": ["python"], "min_stars": 100, "max_items": 10})
+
+        repos = [_make_repo(
+            1, "owner/repo1", "A comprehensive developer tools suite", "Python", 2000,
+            topics=["a", "b", "c", "d", "e", "f", "g"],
+        )]
+
+        with patch("worldlines.ingestion.github_adapter.httpx.get", side_effect=_mock_get(repos)):
+            result = adapter.fetch()
+
+        assert "Topics: a, b, c, d, e" in result[0].content
+        assert "f" not in result[0].content
 
     def test_filters_missing_description(self, tmp_path):
         db_path = str(tmp_path / "test.db")

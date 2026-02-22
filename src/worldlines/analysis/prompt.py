@@ -4,6 +4,8 @@ from __future__ import annotations
 
 import re
 
+_MAX_CONTENT_CHARS = 2000
+
 SYSTEM_PROMPT = """\
 You are a structural analyst for a long-term trend intelligence system called Worldlines.
 
@@ -88,7 +90,13 @@ SUMMARY RULES:
 KEY ENTITIES:
 - Extract companies (common names, not legal entities), technologies, government bodies, regions
 - Deduplicate, limit to 5-7 maximum
-- Do not extract generic terms, analysts, or minor entities"""
+- Do not extract generic terms, analysts, or minor entities
+
+THIN CONTENT HANDLING:
+- Some items may have minimal content (e.g., just a title, a brief repo description, or a headline).
+- You must still produce a valid classification. Assign the most likely dimension based on available context.
+- If genuinely uncertain, assign the closest matching dimension with relevance "secondary" and use change_type "neutral" and importance "low".
+- Never return an empty dimensions array."""
 
 USER_PROMPT_TEMPLATE = """\
 Analyze the following item and produce a structured classification.
@@ -153,6 +161,8 @@ def format_user_prompt(
     content: str,
 ) -> str:
     """Format the user prompt with item fields."""
+    if len(content) > _MAX_CONTENT_CHARS:
+        content = content[:_MAX_CONTENT_CHARS] + "..."
     return USER_PROMPT_TEMPLATE.format(
         title=title,
         source_name=source_name,

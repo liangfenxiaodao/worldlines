@@ -42,6 +42,10 @@ class TestSystemPrompt:
         assert "bearish" in SYSTEM_PROMPT
         assert "No predictions" in SYSTEM_PROMPT
 
+    def test_contains_thin_content_handling(self):
+        assert "THIN CONTENT HANDLING" in SYSTEM_PROMPT
+        assert "Never return an empty dimensions array" in SYSTEM_PROMPT
+
 
 # --- User prompt formatting ---
 
@@ -69,6 +73,26 @@ class TestFormatUserPrompt:
         assert '"dimensions"' in prompt
         assert '"change_type"' in prompt
         assert '"key_entities"' in prompt
+
+    def test_truncates_long_content(self):
+        long_content = "x" * 5000
+        prompt = format_user_prompt(
+            title="T", source_name="S", source_type="news",
+            timestamp="2025-01-01", content=long_content,
+        )
+        # 2000 chars + "..." = 2003 chars of content in the prompt
+        assert "x" * 2000 + "..." in prompt
+        assert "x" * 2001 not in prompt
+
+    def test_does_not_truncate_short_content(self):
+        content = "x" * 2000
+        prompt = format_user_prompt(
+            title="T", source_name="S", source_type="news",
+            timestamp="2025-01-01", content=content,
+        )
+        assert "x" * 2000 in prompt
+        # Content at exactly the limit should not have truncation marker appended
+        assert "x" * 2000 + "..." not in prompt
 
     def test_no_unresolved_placeholders(self):
         prompt = format_user_prompt(

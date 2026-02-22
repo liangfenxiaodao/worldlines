@@ -78,19 +78,28 @@ class HNAdapter(SourceAdapter):
                 seen_ids.add(story_id)
                 continue
 
-            url = data.get("url") or f"https://news.ycombinator.com/item?id={story_id}"
+            story_url = data.get("url") or ""
+            url = story_url or f"https://news.ycombinator.com/item?id={story_id}"
             published_at = None
             if data.get("time"):
                 published_at = datetime.fromtimestamp(
                     data["time"], tz=timezone.utc
                 ).isoformat()
 
+            descendants = data.get("descendants", 0)
+            content = f"{title} | {score} points, {descendants} comments"
+            if story_url:
+                from urllib.parse import urlparse
+                domain = urlparse(story_url).netloc
+                if domain:
+                    content += f" | {domain}"
+
             items.append(
                 RawSourceItem(
                     source_name="Hacker News",
                     source_type="news",
                     title=title,
-                    content=title,
+                    content=content,
                     url=url,
                     published_at=published_at,
                 )

@@ -131,7 +131,10 @@ class GitHubTrendingAdapter(SourceAdapter):
                 seen_ids.add(repo_id)
                 continue
 
+            topics = repo.get("topics") or []
             content = f"{description} | {lang} | {stars} stars"
+            if topics:
+                content += f" | Topics: {', '.join(topics[:5])}"
             published_at = repo.get("pushed_at")
 
             items.append(
