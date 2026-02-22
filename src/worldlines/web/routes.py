@@ -2,10 +2,14 @@
 
 from __future__ import annotations
 
+import logging
 import math
+import sqlite3
 
 from fastapi import APIRouter, HTTPException, Query, Request
+from fastapi.responses import JSONResponse
 
+from worldlines.storage.connection import get_connection
 from worldlines.web.models import (
     DigestDetail,
     DigestListResponse,
@@ -24,7 +28,26 @@ from worldlines.web.queries import (
     list_pipeline_runs,
 )
 
+logger = logging.getLogger(__name__)
+
 router = APIRouter()
+health_router = APIRouter()
+
+
+@health_router.get("/health")
+def health(request: Request) -> JSONResponse:
+    """Check database connectivity and return health status."""
+    database_path = request.app.state.database_path
+    try:
+        with get_connection(database_path) as conn:
+            conn.execute("SELECT 1")
+        return JSONResponse({"status": "healthy", "database": "ok"})
+    except (sqlite3.Error, OSError) as exc:
+        logger.warning("Health check failed: %s", exc)
+        return JSONResponse(
+            {"status": "unhealthy", "database": "error", "detail": str(exc)},
+            status_code=503,
+        )
 
 
 @router.get("/stats", response_model=StatsResponse)

@@ -1,17 +1,20 @@
-"""Scheduled job functions — ingestion, analysis, digest."""
+"""Scheduled job functions — ingestion, analysis, digest, backup."""
 
 from __future__ import annotations
 
 import json
 import logging
+import sqlite3
 import uuid
 from datetime import datetime, timedelta, timezone
+from pathlib import Path
 
 from zoneinfo import ZoneInfo
 
 from worldlines.analysis.classifier import classify_item
 from worldlines.config import Config
 from worldlines.digest.digest import generate_digest
+from worldlines.digest.telegram import send_message
 import worldlines.ingestion  # noqa: F401  — triggers adapter registration
 from worldlines.ingestion.normalize import NormalizedItem, ingest_item
 from worldlines.ingestion.registry import get_adapter_class
@@ -45,6 +48,21 @@ def _record_run(
                 error,
             ),
         )
+
+
+def _send_alert(config: Config, message: str) -> None:
+    """Send a Telegram alert for critical failures. Never raises."""
+    try:
+        text = f"[WORLDLINES ALERT]\n{message}"
+        send_message(
+            config.telegram_bot_token,
+            config.telegram_chat_id,
+            text,
+            parse_mode="",
+            max_retries=2,
+        )
+    except Exception:
+        logger.exception("Failed to send alert")
 
 
 def run_ingestion(config: Config) -> None:
@@ -82,6 +100,7 @@ def run_ingestion(config: Config) -> None:
     except Exception:
         logger.exception("Ingestion failed")
         error_msg = "Ingestion failed (see logs)"
+        _send_alert(config, "Ingestion pipeline failed. Check logs for details.")
 
     _record_run(
         config.database_path, "ingestion", started_at,
@@ -177,6 +196,7 @@ def run_analysis(config: Config) -> None:
     except Exception:
         logger.exception("Analysis failed")
         error_msg = "Analysis failed (see logs)"
+        _send_alert(config, "Analysis pipeline failed. Check logs for details.")
 
     _record_run(
         config.database_path, "analysis", started_at,
@@ -234,11 +254,65 @@ def run_digest(config: Config) -> None:
 
         if result.error:
             error_msg = result.error
+            _send_alert(config, f"Digest delivery issue: {result.error}")
     except Exception:
         logger.exception("Digest failed")
         error_msg = "Digest failed (see logs)"
+        _send_alert(config, "Digest pipeline failed. Check logs for details.")
 
     _record_run(config.database_path, "digest", started_at, run_result, error=error_msg)
+
+
+def run_backup(config: Config) -> None:
+    """Create a SQLite backup with retention policy."""
+    started_at = datetime.now(timezone.utc).isoformat()
+    error_msg = None
+    backup_path = ""
+
+    try:
+        backup_dir = Path(config.backup_dir)
+        backup_dir.mkdir(parents=True, exist_ok=True)
+
+        date_str = datetime.now(timezone.utc).strftime("%Y-%m-%d")
+        backup_path = str(backup_dir / f"worldlines-{date_str}.db")
+
+        # Use SQLite backup API for a safe, consistent copy
+        source = sqlite3.connect(config.database_path)
+        try:
+            dest = sqlite3.connect(backup_path)
+            try:
+                source.backup(dest)
+            finally:
+                dest.close()
+        finally:
+            source.close()
+
+        logger.info("Backup created: %s", backup_path)
+
+        # Retention: delete backups older than N days
+        cutoff = datetime.now(timezone.utc) - timedelta(days=config.backup_retention_days)
+        removed = 0
+        for f in sorted(backup_dir.glob("worldlines-*.db")):
+            try:
+                mtime = datetime.fromtimestamp(f.stat().st_mtime, tz=timezone.utc)
+                if mtime < cutoff:
+                    f.unlink()
+                    removed += 1
+            except OSError:
+                logger.warning("Could not remove old backup: %s", f)
+        if removed:
+            logger.info("Removed %d old backup(s)", removed)
+
+    except Exception:
+        logger.exception("Backup failed")
+        error_msg = "Backup failed (see logs)"
+        _send_alert(config, "Database backup failed. Check logs for details.")
+
+    _record_run(
+        config.database_path, "backup", started_at,
+        {"backup_path": backup_path},
+        error=error_msg,
+    )
 
 
 def run_pipeline(config: Config) -> None:

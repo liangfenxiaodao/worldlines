@@ -27,3 +27,10 @@ primary_region = "sjc"
   auto_start_machines = true
   auto_stop_machines = false
   processes = ["app"]
+
+[[http_service.checks]]
+  grace_period = "30s"
+  interval = "30s"
+  method = "GET"
+  path = "/health"
+  timeout = "5s"

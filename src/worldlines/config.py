@@ -41,6 +41,11 @@ class Config:
     telegram_parse_mode: str = "HTML"
     telegram_max_retries: int = 3
 
+    # Optional — Backup
+    backup_dir: str = "/data/backups"
+    backup_retention_days: int = 7
+    backup_schedule_cron: str = "0 3 * * *"
+
     # Optional — Application
     log_level: str = "INFO"
     log_format: str = "json"
@@ -95,6 +100,10 @@ def load_config(env_path: str | Path | None = None) -> Config:
         digest_max_items=int(os.environ.get("DIGEST_MAX_ITEMS", "20")),
         telegram_parse_mode=os.environ.get("TELEGRAM_PARSE_MODE", "HTML"),
         telegram_max_retries=int(os.environ.get("TELEGRAM_MAX_RETRIES", "3")),
+        # Optional — Backup
+        backup_dir=os.environ.get("BACKUP_DIR", "/data/backups"),
+        backup_retention_days=int(os.environ.get("BACKUP_RETENTION_DAYS", "7")),
+        backup_schedule_cron=os.environ.get("BACKUP_SCHEDULE_CRON", "0 3 * * *"),
         # Optional — Application
         log_level=os.environ.get("LOG_LEVEL", "INFO"),
         log_format=os.environ.get("LOG_FORMAT", "json"),

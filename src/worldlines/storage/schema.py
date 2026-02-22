@@ -125,7 +125,7 @@ CREATE INDEX IF NOT EXISTS idx_digests_sent_at ON digests(sent_at);
 -- Pipeline run tracking
 CREATE TABLE IF NOT EXISTS pipeline_runs (
     id          TEXT PRIMARY KEY,
-    run_type    TEXT NOT NULL CHECK (run_type IN ('ingestion', 'analysis', 'digest')),
+    run_type    TEXT NOT NULL CHECK (run_type IN ('ingestion', 'analysis', 'digest', 'backup')),
     started_at  TEXT NOT NULL,
     finished_at TEXT NOT NULL,
     status      TEXT NOT NULL CHECK (status IN ('success', 'error')),
@@ -161,9 +161,40 @@ def _migrate_digests_summary(conn: sqlite3.Connection) -> None:
             pass  # Column already exists
 
 
+def _migrate_pipeline_runs_add_backup(conn: sqlite3.Connection) -> None:
+    """Recreate pipeline_runs table to add 'backup' to run_type CHECK constraint."""
+    # Check if the constraint already includes 'backup' by attempting a test insert+rollback
+    try:
+        conn.execute(
+            "INSERT INTO pipeline_runs (id, run_type, started_at, finished_at, status, result) "
+            "VALUES ('__migration_test__', 'backup', '', '', 'success', '{}')"
+        )
+        # It worked — constraint already allows 'backup', clean up
+        conn.execute("DELETE FROM pipeline_runs WHERE id = '__migration_test__'")
+    except sqlite3.IntegrityError:
+        # Constraint rejected 'backup' — need to recreate table
+        conn.executescript("""
+            CREATE TABLE pipeline_runs_new (
+                id          TEXT PRIMARY KEY,
+                run_type    TEXT NOT NULL CHECK (run_type IN ('ingestion', 'analysis', 'digest', 'backup')),
+                started_at  TEXT NOT NULL,
+                finished_at TEXT NOT NULL,
+                status      TEXT NOT NULL CHECK (status IN ('success', 'error')),
+                result      TEXT NOT NULL,
+                error       TEXT
+            );
+            INSERT INTO pipeline_runs_new SELECT * FROM pipeline_runs;
+            DROP TABLE pipeline_runs;
+            ALTER TABLE pipeline_runs_new RENAME TO pipeline_runs;
+            CREATE INDEX IF NOT EXISTS idx_pipeline_runs_started_at ON pipeline_runs(started_at);
+            CREATE INDEX IF NOT EXISTS idx_pipeline_runs_run_type ON pipeline_runs(run_type);
+        """)
+
+
 def init_db(database_path: str) -> None:
     """Create all tables and indexes if they do not already exist."""
     with get_connection(database_path) as conn:
         conn.executescript(_SCHEMA_SQL)
         _migrate_digests_summary(conn)
+        _migrate_pipeline_runs_add_backup(conn)
     logger.info("Database initialized at %s", database_path)

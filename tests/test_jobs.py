@@ -8,7 +8,13 @@ from unittest.mock import MagicMock, patch
 
 from worldlines.config import Config
 from worldlines.ingestion.normalize import NormalizedItem, NormalizationResult
-from worldlines.jobs import run_analysis, run_digest, run_ingestion, run_pipeline
+from worldlines.jobs import (
+    _send_alert,
+    run_analysis,
+    run_digest,
+    run_ingestion,
+    run_pipeline,
+)
 from worldlines.storage.connection import get_connection
 from worldlines.storage.schema import init_db
 
@@ -349,3 +355,57 @@ class TestRunPipeline:
         mock_ingest.assert_called_once_with(config)
         mock_analyze.assert_called_once_with(config)
         assert call_order == ["ingestion", "analysis"]
+
+
+# --- TestSendAlert ---
+
+
+class TestSendAlert:
+    @patch("worldlines.jobs.send_message")
+    def test_sends_telegram_message(self, mock_send, tmp_path):
+        config = _make_config(tmp_path)
+        _send_alert(config, "Something broke")
+        mock_send.assert_called_once_with(
+            "test-token", "test-chat",
+            "[WORLDLINES ALERT]\nSomething broke",
+            parse_mode="", max_retries=2,
+        )
+
+    @patch("worldlines.jobs.send_message", side_effect=Exception("network error"))
+    def test_never_raises(self, mock_send, tmp_path):
+        config = _make_config(tmp_path)
+        # Should not raise even if send_message fails
+        _send_alert(config, "Something broke")
+
+
+# --- TestAlertOnFailure ---
+
+
+class TestAlertOnFailure:
+    @patch("worldlines.jobs._send_alert")
+    @patch("worldlines.jobs.get_adapter_class", side_effect=Exception("boom"))
+    def test_ingestion_alerts_on_failure(self, mock_cls, mock_alert, tmp_path):
+        config = _make_config(tmp_path)
+        init_db(config.database_path)
+        run_ingestion(config)
+        mock_alert.assert_called_once()
+        assert "ingestion" in mock_alert.call_args[0][1].lower()
+
+    @patch("worldlines.jobs._send_alert")
+    @patch("worldlines.jobs._record_run")
+    def test_analysis_alerts_on_top_level_failure(self, mock_record, mock_alert, tmp_path):
+        config = _make_config(tmp_path)
+        init_db(config.database_path)
+        with patch("worldlines.jobs.get_connection", side_effect=Exception("db fail")):
+            run_analysis(config)
+        mock_alert.assert_called_once()
+        assert "analysis" in mock_alert.call_args[0][1].lower()
+
+    @patch("worldlines.jobs._send_alert")
+    @patch("worldlines.jobs._record_run")
+    @patch("worldlines.jobs.generate_digest", side_effect=Exception("fail"))
+    def test_digest_alerts_on_failure(self, mock_gen, mock_record, mock_alert, tmp_path):
+        config = _make_config(tmp_path)
+        run_digest(config)
+        mock_alert.assert_called_once()
+        assert "digest" in mock_alert.call_args[0][1].lower()

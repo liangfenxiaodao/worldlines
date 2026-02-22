@@ -14,10 +14,13 @@ def main() -> None:
     """Load config, create the FastAPI app, and run via uvicorn."""
     config = load_web_config()
 
-    logging.basicConfig(
-        level=config.log_level,
-        format="%(asctime)s [%(levelname)s] %(name)s: %(message)s",
-    )
+    # Only configure logging if no handlers are set (avoids double-setup
+    # when the main scheduler entry point has already configured logging).
+    if not logging.getLogger().handlers:
+        logging.basicConfig(
+            level=config.log_level,
+            format="%(asctime)s [%(levelname)s] %(name)s: %(message)s",
+        )
 
     app = create_app(config)
     uvicorn.run(app, host=config.web_host, port=config.web_port)

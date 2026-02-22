@@ -14,7 +14,7 @@ from apscheduler.triggers.cron import CronTrigger
 from apscheduler.triggers.interval import IntervalTrigger
 
 from worldlines.config import load_config
-from worldlines.jobs import run_digest, run_pipeline
+from worldlines.jobs import run_backup, run_digest, run_pipeline
 from worldlines.storage import init_db
 from worldlines.web.app import create_app
 from worldlines.web.config import WebConfig
@@ -76,6 +76,22 @@ def _build_scheduler(config):
         args=[config],
         id="digest",
         name="Daily digest",
+    )
+
+    # Schedule daily backup via cron
+    backup_cron = config.backup_schedule_cron.split()
+    scheduler.add_job(
+        run_backup,
+        trigger=CronTrigger(
+            minute=backup_cron[0],
+            hour=backup_cron[1],
+            day=backup_cron[2],
+            month=backup_cron[3],
+            day_of_week=backup_cron[4],
+        ),
+        args=[config],
+        id="backup",
+        name="Daily backup",
     )
 
     return scheduler
