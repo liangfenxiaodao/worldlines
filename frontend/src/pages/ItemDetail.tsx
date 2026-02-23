@@ -1,10 +1,66 @@
 import { useEffect, useState } from "react";
 import { useParams, Link } from "react-router-dom";
 import { fetchItem } from "../api/client";
-import type { ItemDetailResponse } from "../types/api";
+import type { ExposureEntry, ItemDetailResponse } from "../types/api";
 import DimensionBadge from "../components/DimensionBadge";
 import ImportanceBadge from "../components/ImportanceBadge";
 import ChangeTypeBadge from "../components/ChangeTypeBadge";
+
+const EXPOSURE_TYPE_COLORS: Record<string, string> = {
+  direct: "bg-indigo-100 text-indigo-800",
+  indirect: "bg-cyan-100 text-cyan-800",
+  contextual: "bg-slate-100 text-slate-700",
+};
+
+const STRENGTH_COLORS: Record<string, string> = {
+  core: "bg-red-100 text-red-800",
+  material: "bg-amber-100 text-amber-800",
+  peripheral: "bg-gray-100 text-gray-600",
+};
+
+const CONFIDENCE_COLORS: Record<string, string> = {
+  high: "bg-green-100 text-green-800",
+  medium: "bg-yellow-100 text-yellow-800",
+  low: "bg-gray-100 text-gray-500",
+};
+
+const ROLE_LABELS: Record<string, string> = {
+  infrastructure_operator: "Infrastructure",
+  upstream_supplier: "Supplier",
+  downstream_adopter: "Adopter",
+  platform_intermediary: "Platform",
+  regulated_entity: "Regulated",
+  capital_allocator: "Capital",
+  other: "Other",
+};
+
+function ExposureCard({ exp }: { exp: ExposureEntry }) {
+  return (
+    <div className="border border-gray-200 rounded px-4 py-3">
+      <div className="flex items-center gap-2 mb-2 flex-wrap">
+        <span className="font-mono font-semibold text-sm">{exp.ticker}</span>
+        <span className={`text-xs px-2 py-0.5 rounded font-medium ${EXPOSURE_TYPE_COLORS[exp.exposure_type] ?? "bg-gray-100 text-gray-700"}`}>
+          {exp.exposure_type}
+        </span>
+        <span className={`text-xs px-2 py-0.5 rounded font-medium ${STRENGTH_COLORS[exp.exposure_strength] ?? "bg-gray-100 text-gray-700"}`}>
+          {exp.exposure_strength}
+        </span>
+        <span className={`text-xs px-2 py-0.5 rounded font-medium ${CONFIDENCE_COLORS[exp.confidence] ?? "bg-gray-100 text-gray-700"}`}>
+          {exp.confidence} confidence
+        </span>
+        <span className="text-xs bg-gray-100 text-gray-600 px-2 py-0.5 rounded">
+          {ROLE_LABELS[exp.business_role] ?? exp.business_role}
+        </span>
+      </div>
+      <p className="text-sm text-gray-700 mb-2">{exp.rationale}</p>
+      <div className="flex gap-1 flex-wrap">
+        {exp.dimensions_implicated.map((d) => (
+          <DimensionBadge key={d} dimension={d} />
+        ))}
+      </div>
+    </div>
+  );
+}
 
 export default function ItemDetail() {
   const { id } = useParams<{ id: string }>();
@@ -23,7 +79,7 @@ export default function ItemDetail() {
   if (error) return <p className="text-red-600">{error}</p>;
   if (!data) return <p className="text-gray-500">Loading...</p>;
 
-  const { item, analysis } = data;
+  const { item, analysis, exposure } = data;
 
   return (
     <div>
@@ -84,6 +140,26 @@ export default function ItemDetail() {
           <div className="text-xs text-gray-400">
             Analyzed {analysis.analyzed_at} &middot; v{analysis.analysis_version}
           </div>
+        </div>
+      )}
+
+      {exposure && exposure.exposures.length > 0 && (
+        <div className="bg-white rounded shadow px-5 py-4 mt-6">
+          <h2 className="text-sm font-medium text-gray-700 mb-3">Structural Exposures</h2>
+          <div className="flex flex-col gap-3">
+            {exposure.exposures.map((exp) => (
+              <ExposureCard key={exp.ticker} exp={exp} />
+            ))}
+          </div>
+          <div className="text-xs text-gray-400 mt-3">Mapped {exposure.mapped_at}</div>
+        </div>
+      )}
+
+      {exposure && exposure.skipped_reason && (
+        <div className="bg-white rounded shadow px-5 py-4 mt-6">
+          <h2 className="text-sm font-medium text-gray-700 mb-1">Structural Exposures</h2>
+          <p className="text-sm text-gray-500 italic">{exposure.skipped_reason}</p>
+          <div className="text-xs text-gray-400 mt-2">Mapped {exposure.mapped_at}</div>
         </div>
       )}
 

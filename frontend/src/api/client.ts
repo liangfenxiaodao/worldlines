@@ -1,6 +1,8 @@
 import type {
   DigestDetail,
   DigestListResponse,
+  ExposureListResponse,
+  ExposuresParams,
   ItemDetailResponse,
   ItemListResponse,
   ItemsParams,
@@ -49,6 +51,17 @@ export function fetchItems(params: ItemsParams = {}): Promise<ItemListResponse> 
 
 export function fetchItem(id: string): Promise<ItemDetailResponse> {
   return request<ItemDetailResponse>(`/items/${encodeURIComponent(id)}`);
+}
+
+export function fetchExposures(params: ExposuresParams = {}): Promise<ExposureListResponse> {
+  const qs = new URLSearchParams();
+  for (const [k, v] of Object.entries(params)) {
+    if (v !== undefined && v !== "") {
+      qs.set(k, String(v));
+    }
+  }
+  const q = qs.toString();
+  return request<ExposureListResponse>(`/exposures${q ? `?${q}` : ""}`);
 }
 
 export function fetchRuns(params: RunsParams = {}): Promise<PipelineRunListResponse> {

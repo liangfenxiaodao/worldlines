@@ -5,6 +5,7 @@ import DigestList from "./pages/DigestList";
 import DigestDetail from "./pages/DigestDetail";
 import ItemList from "./pages/ItemList";
 import ItemDetail from "./pages/ItemDetail";
+import ExposureList from "./pages/ExposureList";
 import Runs from "./pages/Runs";
 
 export default function App() {
@@ -16,6 +17,7 @@ export default function App() {
         <Route path="digests/:date" element={<DigestDetail />} />
         <Route path="items" element={<ItemList />} />
         <Route path="items/:id" element={<ItemDetail />} />
+        <Route path="exposures" element={<ExposureList />} />
         <Route path="runs" element={<Runs />} />
       </Route>
     </Routes>

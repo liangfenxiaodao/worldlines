@@ -88,9 +88,45 @@ export interface AnalysisDetail {
   analysis_version: string;
 }
 
+export interface ExposureEntry {
+  ticker: string;
+  exposure_type: string;
+  business_role: string;
+  exposure_strength: string;
+  confidence: string;
+  dimensions_implicated: string[];
+  rationale: string;
+}
+
+export interface ExposureDetail {
+  id: string;
+  analysis_id: string;
+  exposures: ExposureEntry[];
+  skipped_reason: string | null;
+  mapped_at: string;
+}
+
+export interface ExposureListResponse {
+  exposures: ExposureDetail[];
+  total: number;
+  page: number;
+  per_page: number;
+  pages: number;
+}
+
+export interface ExposuresParams {
+  ticker?: string;
+  exposure_type?: string;
+  date_from?: string;
+  date_to?: string;
+  page?: number;
+  per_page?: number;
+}
+
 export interface ItemDetailResponse {
   item: ItemDetail;
   analysis: AnalysisDetail | null;
+  exposure: ExposureDetail | null;
 }
 
 export interface PipelineRun {

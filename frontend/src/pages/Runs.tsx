@@ -8,6 +8,8 @@ const TYPE_COLORS: Record<string, string> = {
   ingestion: "bg-blue-100 text-blue-800",
   analysis: "bg-purple-100 text-purple-800",
   digest: "bg-amber-100 text-amber-800",
+  exposure: "bg-indigo-100 text-indigo-800",
+  backup: "bg-gray-100 text-gray-700",
 };
 
 function formatDuration(start: string, end: string): string {
@@ -76,7 +78,9 @@ export default function Runs() {
           <option value="">All types</option>
           <option value="ingestion">Ingestion</option>
           <option value="analysis">Analysis</option>
+          <option value="exposure">Exposure</option>
           <option value="digest">Digest</option>
+          <option value="backup">Backup</option>
         </select>
       </div>
 
