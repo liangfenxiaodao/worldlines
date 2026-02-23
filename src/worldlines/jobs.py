@@ -179,9 +179,15 @@ def run_analysis(config: Config) -> None:
                     )
                     if result.error:
                         errors += 1
-                        _record_analysis_error(
-                            config.database_path, item.id, result.error.get("message", "")
-                        )
+                        error_code = result.error.get("code", "")
+                        # Only count item-specific errors toward the retry limit.
+                        # Transient API errors (billing, rate limits, outages) should
+                        # not permanently block items from being retried.
+                        if error_code != "api_error":
+                            _record_analysis_error(
+                                config.database_path, item.id,
+                                result.error.get("message", ""),
+                            )
                         logger.warning(
                             "Classification error for item %s: %s", item.id, result.error
                         )

@@ -271,7 +271,7 @@ class TestRunAnalysis:
             _seed_item(conn, "item-2", "Article Two")
 
         mock_classify.side_effect = [
-            MagicMock(error={"code": "api_error", "message": "timeout"}),
+            MagicMock(error={"code": "parse_error", "message": "bad json"}),
             MagicMock(error=None),
         ]
 
@@ -280,6 +280,48 @@ class TestRunAnalysis:
             mock_logger.info.assert_any_call(
                 "Analysis complete: %d analyzed, %d errors", 1, 1
             )
+
+    @patch("worldlines.jobs.classify_item")
+    def test_api_error_does_not_record_analysis_error(self, mock_classify, tmp_path):
+        """Transient API errors (billing, rate limits) should not count toward retry limit."""
+        config = _make_config(tmp_path)
+        init_db(config.database_path)
+
+        with get_connection(config.database_path) as conn:
+            _seed_item(conn, "item-1", "Article One")
+
+        mock_classify.return_value = MagicMock(
+            error={"code": "api_error", "message": "credit balance too low"}
+        )
+
+        run_analysis(config)
+
+        with get_connection(config.database_path) as conn:
+            count = conn.execute("SELECT COUNT(*) FROM analysis_errors").fetchone()[0]
+        assert count == 0
+
+    @patch("worldlines.jobs.classify_item")
+    def test_parse_error_records_analysis_error(self, mock_classify, tmp_path):
+        """Item-specific errors (parse, validation) should count toward retry limit."""
+        config = _make_config(tmp_path)
+        init_db(config.database_path)
+
+        with get_connection(config.database_path) as conn:
+            _seed_item(conn, "item-1", "Article One")
+
+        mock_classify.return_value = MagicMock(
+            error={"code": "parse_error", "message": "invalid JSON"}
+        )
+
+        run_analysis(config)
+
+        with get_connection(config.database_path) as conn:
+            row = conn.execute(
+                "SELECT attempt_count FROM analysis_errors WHERE item_id = ?",
+                ("item-1",),
+            ).fetchone()
+        assert row is not None
+        assert row["attempt_count"] == 1
 
 
 # --- TestRunDigest ---
