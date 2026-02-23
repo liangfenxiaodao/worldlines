@@ -99,9 +99,39 @@ class AnalysisDetail(BaseModel):
     eligible_for_exposure_mapping: bool
 
 
+class ExposureEntry(BaseModel):
+    ticker: str
+    exposure_type: str
+    business_role: str
+    exposure_strength: str
+    confidence: str
+    dimensions_implicated: list[str]
+    rationale: str
+
+
+class ExposureDetail(BaseModel):
+    id: str
+    analysis_id: str
+    exposures: list[ExposureEntry]
+    skipped_reason: str | None = None
+    mapped_at: str
+
+
 class ItemDetailResponse(BaseModel):
     item: ItemDetail
     analysis: AnalysisDetail | None
+    exposure: ExposureDetail | None = None
+
+
+# ---------------------------------------------------------------------------
+# Exposures
+# ---------------------------------------------------------------------------
+class ExposureListResponse(BaseModel):
+    exposures: list[ExposureDetail]
+    total: int
+    page: int
+    per_page: int
+    pages: int
 
 
 # ---------------------------------------------------------------------------

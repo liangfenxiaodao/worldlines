@@ -12,6 +12,7 @@ from pathlib import Path
 from zoneinfo import ZoneInfo
 
 from worldlines.analysis.classifier import classify_item
+from worldlines.exposure.mapper import map_exposures
 from worldlines.config import Config
 from worldlines.digest.digest import generate_digest
 from worldlines.digest.telegram import send_message
@@ -321,7 +322,125 @@ def run_backup(config: Config) -> None:
     )
 
 
+_MAX_EXPOSURE_ATTEMPTS = 3
+
+
+def _record_exposure_error(database_path: str, analysis_id: str, error_msg: str) -> None:
+    """Upsert an error record for a failed exposure mapping attempt."""
+    now = datetime.now(timezone.utc).isoformat()
+    with get_connection(database_path) as conn:
+        conn.execute(
+            "INSERT INTO exposure_errors (analysis_id, attempt_count, last_error, last_attempted_at) "
+            "VALUES (?, 1, ?, ?) "
+            "ON CONFLICT(analysis_id) DO UPDATE SET "
+            "attempt_count = attempt_count + 1, last_error = ?, last_attempted_at = ?",
+            (analysis_id, error_msg, now, error_msg, now),
+        )
+
+
+def run_exposure_mapping(config: Config) -> None:
+    """Find eligible unmapped analyses and map exposures with the LLM."""
+    started_at = datetime.now(timezone.utc).isoformat()
+    error_msg = None
+    analyses_found = 0
+    mapped = 0
+    skipped = 0
+    errors = 0
+
+    try:
+        with get_connection(config.database_path) as conn:
+            rows = conn.execute(
+                "SELECT a.id AS analysis_id, a.dimensions, a.change_type, a.time_horizon, "
+                "a.summary, a.importance, a.key_entities, "
+                "i.title, i.source_name, i.source_type "
+                "FROM analyses a "
+                "JOIN items i ON a.item_id = i.id "
+                "LEFT JOIN exposures e ON a.id = e.analysis_id "
+                "LEFT JOIN exposure_errors ee ON a.id = ee.analysis_id "
+                "WHERE a.eligible_for_exposure_mapping = 1 "
+                "AND e.id IS NULL "
+                "AND (ee.attempt_count IS NULL OR ee.attempt_count < ?) "
+                "ORDER BY a.analyzed_at ASC",
+                (_MAX_EXPOSURE_ATTEMPTS,),
+            ).fetchall()
+
+        analyses_found = len(rows)
+
+        if not rows:
+            logger.info("Exposure mapping: no eligible unmapped analyses found")
+        else:
+            logger.info("Exposure mapping: found %d eligible unmapped analyses", len(rows))
+
+            for row in rows:
+                analysis = {
+                    "analysis_id": row["analysis_id"],
+                    "dimensions": row["dimensions"],
+                    "change_type": row["change_type"],
+                    "time_horizon": row["time_horizon"],
+                    "summary": row["summary"],
+                    "importance": row["importance"],
+                    "key_entities": row["key_entities"],
+                }
+                item = {
+                    "title": row["title"],
+                    "source_name": row["source_name"],
+                    "source_type": row["source_type"],
+                }
+                try:
+                    result = map_exposures(
+                        analysis,
+                        item,
+                        api_key=config.llm_api_key,
+                        model=config.llm_model,
+                        exposure_mapping_version=config.exposure_mapping_version,
+                        database_path=config.database_path,
+                        temperature=config.llm_temperature,
+                        max_retries=config.llm_max_retries,
+                        timeout=config.llm_timeout_seconds,
+                    )
+                    if result.error:
+                        errors += 1
+                        error_code = result.error.get("code", "")
+                        if error_code != "api_error":
+                            _record_exposure_error(
+                                config.database_path, row["analysis_id"],
+                                result.error.get("message", ""),
+                            )
+                        logger.warning(
+                            "Exposure mapping error for analysis %s: %s",
+                            row["analysis_id"], result.error,
+                        )
+                    elif result.skipped_reason:
+                        skipped += 1
+                    else:
+                        mapped += 1
+                except Exception:
+                    errors += 1
+                    _record_exposure_error(
+                        config.database_path, row["analysis_id"], "unexpected error"
+                    )
+                    logger.exception(
+                        "Unexpected error mapping analysis %s", row["analysis_id"]
+                    )
+
+            logger.info(
+                "Exposure mapping complete: %d mapped, %d skipped, %d errors",
+                mapped, skipped, errors,
+            )
+    except Exception:
+        logger.exception("Exposure mapping failed")
+        error_msg = "Exposure mapping failed (see logs)"
+        _send_alert(config, "Exposure mapping pipeline failed. Check logs for details.")
+
+    _record_run(
+        config.database_path, "exposure", started_at,
+        {"analyses_found": analyses_found, "mapped": mapped, "skipped": skipped, "errors": errors},
+        error=error_msg,
+    )
+
+
 def run_pipeline(config: Config) -> None:
-    """Run ingestion then analysis sequentially."""
+    """Run ingestion, analysis, then exposure mapping sequentially."""
     run_ingestion(config)
     run_analysis(config)
+    run_exposure_mapping(config)

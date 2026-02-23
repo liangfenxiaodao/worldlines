@@ -53,6 +53,7 @@ CREATE TABLE IF NOT EXISTS exposures (
     id              TEXT PRIMARY KEY,
     analysis_id     TEXT NOT NULL REFERENCES analyses(id),
     exposures       TEXT NOT NULL,              -- JSON array
+    skipped_reason  TEXT,                       -- null when exposures exist, non-null when skipped
     mapped_at       TEXT NOT NULL
 );
 
@@ -126,7 +127,7 @@ CREATE INDEX IF NOT EXISTS idx_digests_sent_at ON digests(sent_at);
 -- Pipeline run tracking
 CREATE TABLE IF NOT EXISTS pipeline_runs (
     id          TEXT PRIMARY KEY,
-    run_type    TEXT NOT NULL CHECK (run_type IN ('ingestion', 'analysis', 'digest', 'backup')),
+    run_type    TEXT NOT NULL CHECK (run_type IN ('ingestion', 'analysis', 'digest', 'backup', 'exposure')),
     started_at  TEXT NOT NULL,
     finished_at TEXT NOT NULL,
     status      TEXT NOT NULL CHECK (status IN ('success', 'error')),
@@ -146,6 +147,14 @@ CREATE INDEX IF NOT EXISTS idx_pipeline_runs_run_type ON pipeline_runs(run_type)
 -- Track classification failures to avoid infinite retries
 CREATE TABLE IF NOT EXISTS analysis_errors (
     item_id             TEXT PRIMARY KEY REFERENCES items(id),
+    attempt_count       INTEGER NOT NULL DEFAULT 1,
+    last_error          TEXT NOT NULL,
+    last_attempted_at   TEXT NOT NULL
+);
+
+-- Track exposure mapping failures to avoid infinite retries
+CREATE TABLE IF NOT EXISTS exposure_errors (
+    analysis_id         TEXT PRIMARY KEY REFERENCES analyses(id),
     attempt_count       INTEGER NOT NULL DEFAULT 1,
     last_error          TEXT NOT NULL,
     last_attempted_at   TEXT NOT NULL
@@ -177,7 +186,7 @@ def _migrate_pipeline_runs_add_backup(conn: sqlite3.Connection) -> None:
         conn.executescript("""
             CREATE TABLE pipeline_runs_new (
                 id          TEXT PRIMARY KEY,
-                run_type    TEXT NOT NULL CHECK (run_type IN ('ingestion', 'analysis', 'digest', 'backup')),
+                run_type    TEXT NOT NULL CHECK (run_type IN ('ingestion', 'analysis', 'digest', 'backup', 'exposure')),
                 started_at  TEXT NOT NULL,
                 finished_at TEXT NOT NULL,
                 status      TEXT NOT NULL CHECK (status IN ('success', 'error')),
@@ -213,6 +222,41 @@ def _migrate_analyses_add_eligibility(conn: sqlite3.Connection) -> None:
     )
 
 
+def _migrate_exposures_add_skipped_reason(conn: sqlite3.Connection) -> None:
+    """Add skipped_reason column to existing exposures table."""
+    try:
+        conn.execute("ALTER TABLE exposures ADD COLUMN skipped_reason TEXT")
+    except sqlite3.OperationalError:
+        pass  # Column already exists
+
+
+def _migrate_pipeline_runs_add_exposure(conn: sqlite3.Connection) -> None:
+    """Recreate pipeline_runs table to add 'exposure' to run_type CHECK constraint."""
+    try:
+        conn.execute(
+            "INSERT INTO pipeline_runs (id, run_type, started_at, finished_at, status, result) "
+            "VALUES ('__migration_test__', 'exposure', '', '', 'success', '{}')"
+        )
+        conn.execute("DELETE FROM pipeline_runs WHERE id = '__migration_test__'")
+    except sqlite3.IntegrityError:
+        conn.executescript("""
+            CREATE TABLE pipeline_runs_new (
+                id          TEXT PRIMARY KEY,
+                run_type    TEXT NOT NULL CHECK (run_type IN ('ingestion', 'analysis', 'digest', 'backup', 'exposure')),
+                started_at  TEXT NOT NULL,
+                finished_at TEXT NOT NULL,
+                status      TEXT NOT NULL CHECK (status IN ('success', 'error')),
+                result      TEXT NOT NULL,
+                error       TEXT
+            );
+            INSERT INTO pipeline_runs_new SELECT * FROM pipeline_runs;
+            DROP TABLE pipeline_runs;
+            ALTER TABLE pipeline_runs_new RENAME TO pipeline_runs;
+            CREATE INDEX IF NOT EXISTS idx_pipeline_runs_started_at ON pipeline_runs(started_at);
+            CREATE INDEX IF NOT EXISTS idx_pipeline_runs_run_type ON pipeline_runs(run_type);
+        """)
+
+
 def init_db(database_path: str) -> None:
     """Create all tables and indexes if they do not already exist."""
     with get_connection(database_path) as conn:
@@ -220,4 +264,6 @@ def init_db(database_path: str) -> None:
         _migrate_digests_summary(conn)
         _migrate_pipeline_runs_add_backup(conn)
         _migrate_analyses_add_eligibility(conn)
+        _migrate_exposures_add_skipped_reason(conn)
+        _migrate_pipeline_runs_add_exposure(conn)
     logger.info("Database initialized at %s", database_path)

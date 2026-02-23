@@ -157,6 +157,38 @@ def _seed_digest(conn, digest_id, digest_date, **overrides):
     )
 
 
+def _seed_exposure(conn, exposure_id, analysis_id, **overrides):
+    """Insert a test exposure into the exposures table."""
+    defaults = {
+        "exposures": [
+            {
+                "ticker": "NVDA",
+                "exposure_type": "direct",
+                "business_role": "infrastructure_operator",
+                "exposure_strength": "core",
+                "confidence": "high",
+                "dimensions_implicated": ["compute_and_computational_paradigms"],
+                "rationale": "NVIDIA designs GPU accelerators.",
+            }
+        ],
+        "skipped_reason": None,
+        "mapped_at": "2025-06-15T12:00:00+00:00",
+    }
+    defaults.update(overrides)
+    conn.execute(
+        "INSERT INTO exposures "
+        "(id, analysis_id, exposures, skipped_reason, mapped_at) "
+        "VALUES (?, ?, ?, ?, ?)",
+        (
+            exposure_id,
+            analysis_id,
+            json.dumps(defaults["exposures"]),
+            defaults["skipped_reason"],
+            defaults["mapped_at"],
+        ),
+    )
+
+
 # --- Fixtures ---
 
 
@@ -222,6 +254,9 @@ def seeded_db(db_path):
             dimensions=[{"dimension": "technology_adoption_and_industrial_diffusion", "relevance": "primary"}],
             analyzed_at="2025-06-16T10:00:00+00:00",
         )
+
+        # Exposures — map analysis a-1 (high importance, eligible)
+        _seed_exposure(conn, "exp-1", "a-1")
 
         # Digests
         _seed_digest(
@@ -411,6 +446,63 @@ class TestItems:
             )
             expected = item["importance"] in ("medium", "high") and has_primary
             assert item["eligible_for_exposure_mapping"] == expected
+
+    def test_item_detail_includes_exposure(self, client):
+        resp = client.get("/api/v1/items/item-1")
+        assert resp.status_code == 200
+        data = resp.json()
+        assert "exposure" in data
+        exposure = data["exposure"]
+        assert exposure is not None
+        assert exposure["id"] == "exp-1"
+        assert exposure["analysis_id"] == "a-1"
+        assert len(exposure["exposures"]) == 1
+        assert exposure["exposures"][0]["ticker"] == "NVDA"
+        assert exposure["mapped_at"] is not None
+
+    def test_item_detail_without_exposure(self, client):
+        resp = client.get("/api/v1/items/item-2")
+        assert resp.status_code == 200
+        data = resp.json()
+        assert data["exposure"] is None
+
+
+# --- Tests: Exposures ---
+
+
+class TestExposures:
+    def test_list_exposures_returns_paginated(self, client):
+        resp = client.get("/api/v1/exposures")
+        assert resp.status_code == 200
+        data = resp.json()
+        for key in ("exposures", "total", "page", "per_page", "pages"):
+            assert key in data
+        assert data["total"] == 1
+        assert data["page"] == 1
+
+    def test_list_exposures_filter_by_ticker(self, client):
+        data = client.get("/api/v1/exposures?ticker=NVDA").json()
+        assert data["total"] == 1
+        assert data["exposures"][0]["id"] == "exp-1"
+
+    def test_list_exposures_filter_by_ticker_not_found(self, client):
+        data = client.get("/api/v1/exposures?ticker=AAPL").json()
+        assert data["total"] == 0
+        assert data["exposures"] == []
+
+    def test_list_exposures_filter_by_exposure_type(self, client):
+        data = client.get("/api/v1/exposures?exposure_type=direct").json()
+        assert data["total"] == 1
+
+    def test_list_exposures_filter_by_exposure_type_not_found(self, client):
+        data = client.get("/api/v1/exposures?exposure_type=contextual").json()
+        assert data["total"] == 0
+
+    def test_list_exposures_filter_by_date_range(self, client):
+        data = client.get(
+            "/api/v1/exposures?date_from=2025-06-15T00:00:00&date_to=2025-06-16T00:00:00"
+        ).json()
+        assert data["total"] == 1
 
 
 # --- Tests: Edge Cases ---

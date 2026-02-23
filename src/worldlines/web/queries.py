@@ -275,7 +275,95 @@ def get_item_by_id(database_path: str, item_id: str) -> dict | None:
             "eligible_for_exposure_mapping": bool(row["eligible_for_exposure_mapping"]),
         }
 
-    return {"item": item, "analysis": analysis}
+    # Fetch exposure if analysis exists
+    exposure = None
+    if row["analysis_id"] is not None:
+        with get_readonly_connection(database_path) as conn:
+            exp_row = conn.execute(
+                "SELECT id, analysis_id, exposures, skipped_reason, mapped_at "
+                "FROM exposures WHERE analysis_id = ?",
+                (row["analysis_id"],),
+            ).fetchone()
+        if exp_row is not None:
+            exposure = {
+                "id": exp_row["id"],
+                "analysis_id": exp_row["analysis_id"],
+                "exposures": json.loads(exp_row["exposures"]),
+                "skipped_reason": exp_row["skipped_reason"],
+                "mapped_at": exp_row["mapped_at"],
+            }
+
+    return {"item": item, "analysis": analysis, "exposure": exposure}
+
+
+# ---------------------------------------------------------------------------
+# list_exposures
+# ---------------------------------------------------------------------------
+def list_exposures(
+    database_path: str,
+    *,
+    ticker: str | None = None,
+    exposure_type: str | None = None,
+    date_from: str | None = None,
+    date_to: str | None = None,
+    page: int = 1,
+    per_page: int = 20,
+) -> tuple[list[dict], int]:
+    """Return a paginated list of exposure records, newest first."""
+    offset = (page - 1) * per_page
+    conditions: list[str] = []
+    params: list[object] = []
+
+    if ticker is not None:
+        # Search within JSON array for ticker
+        conditions.append(
+            "EXISTS (SELECT 1 FROM json_each(e.exposures) "
+            "WHERE json_extract(value, '$.ticker') = ?)"
+        )
+        params.append(ticker)
+
+    if exposure_type is not None:
+        conditions.append(
+            "EXISTS (SELECT 1 FROM json_each(e.exposures) "
+            "WHERE json_extract(value, '$.exposure_type') = ?)"
+        )
+        params.append(exposure_type)
+
+    if date_from is not None:
+        conditions.append("e.mapped_at >= ?")
+        params.append(date_from)
+
+    if date_to is not None:
+        conditions.append("e.mapped_at < ?")
+        params.append(date_to)
+
+    where_clause = ""
+    if conditions:
+        where_clause = "WHERE " + " AND ".join(conditions)
+
+    with get_readonly_connection(database_path) as conn:
+        total = conn.execute(
+            f"SELECT COUNT(*) FROM exposures e {where_clause}", params,
+        ).fetchone()[0]
+
+        rows = conn.execute(
+            f"SELECT e.id, e.analysis_id, e.exposures, e.skipped_reason, e.mapped_at "
+            f"FROM exposures e {where_clause} "
+            f"ORDER BY e.mapped_at DESC LIMIT ? OFFSET ?",
+            [*params, per_page, offset],
+        ).fetchall()
+
+    exposures = []
+    for r in rows:
+        exposures.append({
+            "id": r["id"],
+            "analysis_id": r["analysis_id"],
+            "exposures": json.loads(r["exposures"]),
+            "skipped_reason": r["skipped_reason"],
+            "mapped_at": r["mapped_at"],
+        })
+
+    return exposures, total
 
 
 # ---------------------------------------------------------------------------

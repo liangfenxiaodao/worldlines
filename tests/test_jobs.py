@@ -12,6 +12,7 @@ from worldlines.jobs import (
     _send_alert,
     run_analysis,
     run_digest,
+    run_exposure_mapping,
     run_ingestion,
     run_pipeline,
 )
@@ -324,6 +325,147 @@ class TestRunAnalysis:
         assert row["attempt_count"] == 1
 
 
+def _seed_eligible_analysis(conn, analysis_id, item_id):
+    """Insert a test analysis eligible for exposure mapping."""
+    conn.execute(
+        "INSERT INTO analyses "
+        "(id, item_id, dimensions, change_type, time_horizon, summary, "
+        "importance, key_entities, analyzed_at, analysis_version, "
+        "eligible_for_exposure_mapping) "
+        "VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)",
+        (
+            analysis_id, item_id,
+            json.dumps([{"dimension": "compute_and_computational_paradigms", "relevance": "primary"}]),
+            "reinforcing", "medium_term", f"Summary for {item_id}.",
+            "high", json.dumps(["TestEntity"]),
+            "2025-06-15T10:00:00+00:00", "v1", 1,
+        ),
+    )
+
+
+# --- TestRunExposureMapping ---
+
+
+class TestRunExposureMapping:
+    @patch("worldlines.jobs.map_exposures")
+    def test_finds_and_maps_eligible_analyses(self, mock_map, tmp_path):
+        config = _make_config(tmp_path)
+        init_db(config.database_path)
+
+        with get_connection(config.database_path) as conn:
+            _seed_item(conn, "item-1", "Article One")
+            _seed_item(conn, "item-2", "Article Two")
+            # item-1 eligible, item-2 not eligible (low importance)
+            _seed_eligible_analysis(conn, "a-1", "item-1")
+            _seed_analysis(conn, "a-2", "item-2")  # default is medium, but eligible_for_exposure_mapping=0 by default
+
+        mock_map.return_value = MagicMock(error=None, skipped_reason=None)
+
+        run_exposure_mapping(config)
+
+        # Only a-1 should be mapped (eligible=1 and no existing exposure)
+        assert mock_map.call_count == 1
+        call_analysis = mock_map.call_args[0][0]
+        assert call_analysis["analysis_id"] == "a-1"
+
+    @patch("worldlines.jobs.map_exposures")
+    def test_skips_already_mapped(self, mock_map, tmp_path):
+        config = _make_config(tmp_path)
+        init_db(config.database_path)
+
+        with get_connection(config.database_path) as conn:
+            _seed_item(conn, "item-1", "Article One")
+            _seed_eligible_analysis(conn, "a-1", "item-1")
+            # Already has an exposure record
+            conn.execute(
+                "INSERT INTO exposures (id, analysis_id, exposures, mapped_at) "
+                "VALUES (?, ?, ?, ?)",
+                ("e-1", "a-1", "[]", "2025-06-15T11:00:00+00:00"),
+            )
+
+        run_exposure_mapping(config)
+
+        mock_map.assert_not_called()
+
+    @patch("worldlines.jobs.map_exposures")
+    def test_error_handling(self, mock_map, tmp_path):
+        config = _make_config(tmp_path)
+        init_db(config.database_path)
+
+        with get_connection(config.database_path) as conn:
+            _seed_item(conn, "item-1", "Article One")
+            _seed_eligible_analysis(conn, "a-1", "item-1")
+
+        mock_map.return_value = MagicMock(
+            error={"code": "parse_error", "message": "bad json"},
+            skipped_reason=None,
+        )
+
+        run_exposure_mapping(config)
+
+        with get_connection(config.database_path) as conn:
+            row = conn.execute(
+                "SELECT attempt_count FROM exposure_errors WHERE analysis_id = ?",
+                ("a-1",),
+            ).fetchone()
+        assert row is not None
+        assert row["attempt_count"] == 1
+
+    @patch("worldlines.jobs.map_exposures")
+    def test_api_error_does_not_record_exposure_error(self, mock_map, tmp_path):
+        """Transient API errors should not count toward retry limit."""
+        config = _make_config(tmp_path)
+        init_db(config.database_path)
+
+        with get_connection(config.database_path) as conn:
+            _seed_item(conn, "item-1", "Article One")
+            _seed_eligible_analysis(conn, "a-1", "item-1")
+
+        mock_map.return_value = MagicMock(
+            error={"code": "api_error", "message": "timeout"},
+            skipped_reason=None,
+        )
+
+        run_exposure_mapping(config)
+
+        with get_connection(config.database_path) as conn:
+            count = conn.execute("SELECT COUNT(*) FROM exposure_errors").fetchone()[0]
+        assert count == 0
+
+    @patch("worldlines.jobs.map_exposures")
+    def test_continues_on_unexpected_error(self, mock_map, tmp_path):
+        config = _make_config(tmp_path)
+        init_db(config.database_path)
+
+        with get_connection(config.database_path) as conn:
+            _seed_item(conn, "item-1", "Article One")
+            _seed_item(conn, "item-2", "Article Two")
+            _seed_eligible_analysis(conn, "a-1", "item-1")
+            _seed_eligible_analysis(conn, "a-2", "item-2")
+
+        mock_map.side_effect = [
+            Exception("unexpected"),
+            MagicMock(error=None, skipped_reason=None),
+        ]
+
+        run_exposure_mapping(config)
+
+        assert mock_map.call_count == 2
+
+    @patch("worldlines.jobs.map_exposures")
+    def test_logs_when_no_eligible(self, mock_map, tmp_path):
+        config = _make_config(tmp_path)
+        init_db(config.database_path)
+
+        with patch("worldlines.jobs.logger") as mock_logger:
+            run_exposure_mapping(config)
+            mock_logger.info.assert_any_call(
+                "Exposure mapping: no eligible unmapped analyses found"
+            )
+
+        mock_map.assert_not_called()
+
+
 # --- TestRunDigest ---
 
 
@@ -383,20 +525,23 @@ class TestRunDigest:
 
 
 class TestRunPipeline:
+    @patch("worldlines.jobs.run_exposure_mapping")
     @patch("worldlines.jobs.run_analysis")
     @patch("worldlines.jobs.run_ingestion")
-    def test_calls_ingestion_then_analysis(self, mock_ingest, mock_analyze, tmp_path):
+    def test_calls_ingestion_analysis_exposure(self, mock_ingest, mock_analyze, mock_exposure, tmp_path):
         config = _make_config(tmp_path)
 
         call_order = []
         mock_ingest.side_effect = lambda c: call_order.append("ingestion")
         mock_analyze.side_effect = lambda c: call_order.append("analysis")
+        mock_exposure.side_effect = lambda c: call_order.append("exposure")
 
         run_pipeline(config)
 
         mock_ingest.assert_called_once_with(config)
         mock_analyze.assert_called_once_with(config)
-        assert call_order == ["ingestion", "analysis"]
+        mock_exposure.assert_called_once_with(config)
+        assert call_order == ["ingestion", "analysis", "exposure"]
 
 
 # --- TestSendAlert ---
@@ -451,3 +596,13 @@ class TestAlertOnFailure:
         run_digest(config)
         mock_alert.assert_called_once()
         assert "digest" in mock_alert.call_args[0][1].lower()
+
+    @patch("worldlines.jobs._send_alert")
+    @patch("worldlines.jobs._record_run")
+    def test_exposure_alerts_on_top_level_failure(self, mock_record, mock_alert, tmp_path):
+        config = _make_config(tmp_path)
+        init_db(config.database_path)
+        with patch("worldlines.jobs.get_connection", side_effect=Exception("db fail")):
+            run_exposure_mapping(config)
+        mock_alert.assert_called_once()
+        assert "exposure" in mock_alert.call_args[0][1].lower()

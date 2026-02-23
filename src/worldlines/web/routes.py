@@ -13,6 +13,7 @@ from worldlines.storage.connection import get_connection
 from worldlines.web.models import (
     DigestDetail,
     DigestListResponse,
+    ExposureListResponse,
     ItemDetailResponse,
     ItemListResponse,
     ItemSummary,
@@ -24,6 +25,7 @@ from worldlines.web.queries import (
     get_item_by_id,
     get_stats,
     list_digests,
+    list_exposures,
     list_items,
     list_pipeline_runs,
 )
@@ -143,6 +145,36 @@ def item_by_id(request: Request, item_id: str) -> ItemDetailResponse:
     if data is None:
         raise HTTPException(status_code=404, detail="Item not found")
     return ItemDetailResponse(**data)
+
+
+@router.get("/exposures", response_model=ExposureListResponse)
+def exposures(
+    request: Request,
+    ticker: str | None = None,
+    exposure_type: str | None = None,
+    date_from: str | None = None,
+    date_to: str | None = None,
+    page: int = Query(1, ge=1),
+    per_page: int = Query(20, ge=1, le=100),
+) -> ExposureListResponse:
+    database_path = request.app.state.database_path
+    rows, total = list_exposures(
+        database_path,
+        ticker=ticker,
+        exposure_type=exposure_type,
+        date_from=date_from,
+        date_to=date_to,
+        page=page,
+        per_page=per_page,
+    )
+    pages = math.ceil(total / per_page) if total else 0
+    return ExposureListResponse(
+        exposures=rows,
+        total=total,
+        page=page,
+        per_page=per_page,
+        pages=pages,
+    )
 
 
 @router.get("/runs", response_model=PipelineRunListResponse)

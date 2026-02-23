@@ -28,6 +28,7 @@ class Config:
 
     # Optional — Analysis
     analysis_version: str = "v1"
+    exposure_mapping_version: str = "v1"
 
     # Optional — Ingestion
     fetch_interval_minutes: int = 60
@@ -90,6 +91,7 @@ def load_config(env_path: str | Path | None = None) -> Config:
         llm_temperature=float(os.environ.get("LLM_TEMPERATURE", "0.0")),
         # Optional — Analysis
         analysis_version=os.environ.get("ANALYSIS_VERSION", "v1"),
+        exposure_mapping_version=os.environ.get("EXPOSURE_MAPPING_VERSION", "v1"),
         # Optional — Ingestion
         fetch_interval_minutes=int(os.environ.get("FETCH_INTERVAL_MINUTES", "60")),
         max_items_per_source=int(os.environ.get("MAX_ITEMS_PER_SOURCE", "50")),
