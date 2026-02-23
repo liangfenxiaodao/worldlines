@@ -63,9 +63,9 @@ When analyzing information, always aim to:
 
 ## Tech Stack
 - **Backend:** Python
-- **Frontend:** Node.js (post-MVP, not needed for MVP)
+- **Frontend:** Node.js (https://worldlines.fly.dev/)
 - **Database:** SQLite (single file, persistent volume)
-- **Deployment:** Fly.io (free tier, persistent disk for SQLite)
+- **Deployment:** Fly.io (persistent disk for SQLite)
 - **LLM:** Anthropic Claude API
 
 ## MVP Scope
@@ -80,11 +80,14 @@ MVP includes:
 - Fly.io deployment with secrets via `fly secrets set`
 
 Post-MVP (iterate after shipping):
-- Structural exposure mapping
 - Additional source adapters
-- Query interfaces and review surfaces
 - Temporal linking and re-analysis
-- CI/CD, monitoring, periodic summaries
+- CI/CD, periodic summaries
+
+Shipped post-MVP:
+- Structural exposure mapping
+- Web frontend (https://worldlines.fly.dev/)
+- Monitoring, backups, and failure alerts
 
 ## Development Guidance
 - Follow the documented system design, schemas, and API contracts strictly
