@@ -192,6 +192,11 @@ def run_analysis(config: Config) -> None:
                         logger.warning(
                             "Classification error for item %s: %s", item.id, result.error
                         )
+                        # Stop processing if the API is unavailable — remaining items
+                        # will fail for the same reason.
+                        if error_code == "api_error":
+                            logger.warning("API error detected; stopping analysis early")
+                            break
                     else:
                         analyzed += 1
                 except Exception:
@@ -360,8 +365,9 @@ def run_exposure_mapping(config: Config) -> None:
                 "WHERE a.eligible_for_exposure_mapping = 1 "
                 "AND e.id IS NULL "
                 "AND (ee.attempt_count IS NULL OR ee.attempt_count < ?) "
-                "ORDER BY a.analyzed_at ASC",
-                (_MAX_EXPOSURE_ATTEMPTS,),
+                "ORDER BY a.analyzed_at ASC "
+                "LIMIT ?",
+                (_MAX_EXPOSURE_ATTEMPTS, config.exposure_max_per_run),
             ).fetchall()
 
         analyses_found = len(rows)
@@ -410,6 +416,11 @@ def run_exposure_mapping(config: Config) -> None:
                             "Exposure mapping error for analysis %s: %s",
                             row["analysis_id"], result.error,
                         )
+                        # Stop processing if the API is unavailable — remaining items
+                        # will fail for the same reason.
+                        if error_code == "api_error":
+                            logger.warning("API error detected; stopping exposure mapping early")
+                            break
                     elif result.skipped_reason:
                         skipped += 1
                     else:

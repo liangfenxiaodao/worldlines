@@ -324,6 +324,25 @@ class TestRunAnalysis:
         assert row is not None
         assert row["attempt_count"] == 1
 
+    @patch("worldlines.jobs.classify_item")
+    def test_api_error_stops_analysis_early(self, mock_classify, tmp_path):
+        """An api_error on one item should stop processing remaining items."""
+        config = _make_config(tmp_path)
+        init_db(config.database_path)
+
+        with get_connection(config.database_path) as conn:
+            _seed_item(conn, "item-1", "Article One")
+            _seed_item(conn, "item-2", "Article Two")
+
+        mock_classify.return_value = MagicMock(
+            error={"code": "api_error", "message": "credit balance too low"}
+        )
+
+        run_analysis(config)
+
+        # Should stop after first api_error, not attempt item-2
+        assert mock_classify.call_count == 1
+
 
 def _seed_eligible_analysis(conn, analysis_id, item_id):
     """Insert a test analysis eligible for exposure mapping."""
@@ -464,6 +483,46 @@ class TestRunExposureMapping:
             )
 
         mock_map.assert_not_called()
+
+    @patch("worldlines.jobs.map_exposures")
+    def test_api_error_stops_mapping_early(self, mock_map, tmp_path):
+        """An api_error on one analysis should stop processing remaining analyses."""
+        config = _make_config(tmp_path)
+        init_db(config.database_path)
+
+        with get_connection(config.database_path) as conn:
+            _seed_item(conn, "item-1", "Article One")
+            _seed_item(conn, "item-2", "Article Two")
+            _seed_eligible_analysis(conn, "a-1", "item-1")
+            _seed_eligible_analysis(conn, "a-2", "item-2")
+
+        mock_map.return_value = MagicMock(
+            error={"code": "api_error", "message": "credit balance too low"},
+            skipped_reason=None,
+        )
+
+        run_exposure_mapping(config)
+
+        # Should stop after first api_error, not attempt a-2
+        assert mock_map.call_count == 1
+
+    @patch("worldlines.jobs.map_exposures")
+    def test_respects_max_per_run_limit(self, mock_map, tmp_path):
+        """exposure_max_per_run should cap the number of analyses processed per cycle."""
+        config = _make_config(tmp_path, exposure_max_per_run=2)
+        init_db(config.database_path)
+
+        with get_connection(config.database_path) as conn:
+            for i in range(1, 5):
+                _seed_item(conn, f"item-{i}", f"Article {i}")
+                _seed_eligible_analysis(conn, f"a-{i}", f"item-{i}")
+
+        mock_map.return_value = MagicMock(error=None, skipped_reason=None)
+
+        run_exposure_mapping(config)
+
+        # Only 2 of the 4 eligible analyses should be processed
+        assert mock_map.call_count == 2
 
 
 # --- TestRunDigest ---
