@@ -51,9 +51,13 @@ RATIONALE RULES:
 - No forbidden terms: bullish, bearish, buy, sell, upside, downside, outperform, underperform
 
 TICKER RULES:
-- Use the primary exchange ticker symbol (e.g., AAPL, TSMC, 9984.T)
+- Use the primary exchange ticker symbol (e.g., AAPL, MSFT, 9984.T)
 - Only include publicly listed companies
 - Do not include private companies, government entities, or non-equity instruments
+- For companies with multiple share classes, always use the most widely traded class:
+  use GOOGL (not GOOG), BRK-B (not BRK-A), use the standard class not a restricted variant
+- For companies dual-listed in the US and abroad, prefer the US ticker (NYSE/NASDAQ)
+- Use a single canonical ticker per company — never list the same company twice under different symbols
 
 WHEN TO RETURN EMPTY:
 - The analysis describes abstract or theoretical discussions without identifiable company exposure
