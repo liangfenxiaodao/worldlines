@@ -6,9 +6,24 @@ from pathlib import Path
 
 from fastapi import FastAPI
 from fastapi.staticfiles import StaticFiles
+from starlette.exceptions import HTTPException
+from starlette.responses import FileResponse
+from starlette.types import Scope
 
 from worldlines.web.config import WebConfig
 from worldlines.web.routes import health_router, router
+
+
+class _SPAStaticFiles(StaticFiles):
+    """StaticFiles that falls back to index.html for unknown paths (SPA routing)."""
+
+    async def get_response(self, path: str, scope: Scope) -> FileResponse:
+        try:
+            return await super().get_response(path, scope)
+        except HTTPException as exc:
+            if exc.status_code == 404:
+                return await super().get_response("index.html", scope)
+            raise
 
 
 def create_app(config: WebConfig, lifespan=None) -> FastAPI:
@@ -20,6 +35,6 @@ def create_app(config: WebConfig, lifespan=None) -> FastAPI:
 
     static_path = Path(config.static_dir)
     if static_path.is_dir():
-        app.mount("/", StaticFiles(directory=str(static_path), html=True), name="static")
+        app.mount("/", _SPAStaticFiles(directory=str(static_path), html=True), name="static")
 
     return app
