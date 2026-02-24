@@ -118,10 +118,23 @@ class ExposureDetail(BaseModel):
     mapped_at: str
 
 
+class TemporalLinkEntry(BaseModel):
+    id: str
+    direction: str          # 'outgoing' | 'incoming'
+    link_type: str
+    rationale: str
+    created_at: str
+    linked_item_id: str
+    linked_item_title: str
+    linked_item_source: str
+    linked_item_timestamp: str
+
+
 class ItemDetailResponse(BaseModel):
     item: ItemDetail
     analysis: AnalysisDetail | None
     exposure: ExposureDetail | None = None
+    temporal_links: list[TemporalLinkEntry] | None = None
 
 
 # ---------------------------------------------------------------------------

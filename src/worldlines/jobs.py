@@ -450,8 +450,110 @@ def run_exposure_mapping(config: Config) -> None:
     )
 
 
+_TEMPORAL_LINK_WINDOW_DAYS = 90
+
+
+def _determine_link_type(newer_change_type: str, older_change_type: str) -> str:
+    """Determine the link type based on the change types of two linked items."""
+    if newer_change_type == older_change_type:
+        return "reinforces"
+    if {newer_change_type, older_change_type} == {"reinforcing", "friction"}:
+        return "contradicts"
+    return "extends"
+
+
+def run_temporal_linking(config: Config) -> None:
+    """Link articles that share ticker symbols within the 90-day window."""
+    started_at = datetime.now(timezone.utc).isoformat()
+    error_msg = None
+    links_created = 0
+    pairs_considered = 0
+
+    try:
+        cutoff = (datetime.now(timezone.utc) - timedelta(days=_TEMPORAL_LINK_WINDOW_DAYS)).isoformat()
+        now = datetime.now(timezone.utc).isoformat()
+
+        with get_connection(config.database_path) as conn:
+            rows = conn.execute(
+                "SELECT i.id AS item_id, i.timestamp AS item_timestamp, a.change_type, "
+                "json_extract(t.value, '$.ticker') AS ticker "
+                "FROM items i "
+                "JOIN analyses a ON a.item_id = i.id "
+                "JOIN exposures e ON e.analysis_id = a.id "
+                "JOIN json_each(e.exposures) t "
+                "WHERE e.skipped_reason IS NULL "
+                "AND json_extract(t.value, '$.ticker') IS NOT NULL "
+                "AND i.timestamp >= ?",
+                (cutoff,),
+            ).fetchall()
+
+        # Group by ticker -> list of {item_id, timestamp, change_type}
+        ticker_items: dict[str, list[dict]] = {}
+        for r in rows:
+            ticker = r["ticker"]
+            if ticker not in ticker_items:
+                ticker_items[ticker] = []
+            ticker_items[ticker].append({
+                "item_id": r["item_id"],
+                "timestamp": r["item_timestamp"],
+                "change_type": r["change_type"],
+            })
+
+        # For each ticker with >=2 items, form ordered pairs (newer -> older)
+        # Accumulate per unique (source_id, target_id): shared tickers and change_types
+        pair_data: dict[tuple[str, str], dict] = {}
+        for ticker, items in ticker_items.items():
+            if len(items) < 2:
+                continue
+            # Sort descending by timestamp
+            sorted_items = sorted(items, key=lambda x: x["timestamp"], reverse=True)
+            for i, newer in enumerate(sorted_items):
+                for older in sorted_items[i + 1:]:
+                    key = (newer["item_id"], older["item_id"])
+                    if key not in pair_data:
+                        pair_data[key] = {
+                            "tickers": [],
+                            "newer_ct": newer["change_type"],
+                            "older_ct": older["change_type"],
+                        }
+                    pair_data[key]["tickers"].append(ticker)
+
+        pairs_considered = len(pair_data)
+
+        with get_connection(config.database_path) as conn:
+            for (source_id, target_id), data in pair_data.items():
+                shared_tickers = data["tickers"]
+                newer_ct = data["newer_ct"]
+                older_ct = data["older_ct"]
+                link_type = _determine_link_type(newer_ct, older_ct)
+                rationale = f"Shared: {', '.join(sorted(shared_tickers))}. {newer_ct} \u2194 {older_ct}."
+                cursor = conn.execute(
+                    "INSERT OR IGNORE INTO temporal_links "
+                    "(id, source_item_id, target_item_id, link_type, created_at, rationale) "
+                    "VALUES (?, ?, ?, ?, ?, ?)",
+                    (str(uuid.uuid4()), source_id, target_id, link_type, now, rationale),
+                )
+                links_created += cursor.rowcount
+
+        logger.info(
+            "Temporal linking complete: %d links created, %d pairs considered",
+            links_created, pairs_considered,
+        )
+    except Exception:
+        logger.exception("Temporal linking failed")
+        error_msg = "Temporal linking failed (see logs)"
+        _send_alert(config, "Temporal linking pipeline failed. Check logs for details.")
+
+    _record_run(
+        config.database_path, "temporal_linking", started_at,
+        {"links_created": links_created, "pairs_considered": pairs_considered},
+        error=error_msg,
+    )
+
+
 def run_pipeline(config: Config) -> None:
-    """Run ingestion, analysis, then exposure mapping sequentially."""
+    """Run ingestion, analysis, exposure mapping, then temporal linking sequentially."""
     run_ingestion(config)
     run_analysis(config)
     run_exposure_mapping(config)
+    run_temporal_linking(config)

@@ -584,23 +584,26 @@ class TestRunDigest:
 
 
 class TestRunPipeline:
+    @patch("worldlines.jobs.run_temporal_linking")
     @patch("worldlines.jobs.run_exposure_mapping")
     @patch("worldlines.jobs.run_analysis")
     @patch("worldlines.jobs.run_ingestion")
-    def test_calls_ingestion_analysis_exposure(self, mock_ingest, mock_analyze, mock_exposure, tmp_path):
+    def test_calls_ingestion_analysis_exposure(self, mock_ingest, mock_analyze, mock_exposure, mock_temporal, tmp_path):
         config = _make_config(tmp_path)
 
         call_order = []
         mock_ingest.side_effect = lambda c: call_order.append("ingestion")
         mock_analyze.side_effect = lambda c: call_order.append("analysis")
         mock_exposure.side_effect = lambda c: call_order.append("exposure")
+        mock_temporal.side_effect = lambda c: call_order.append("temporal_linking")
 
         run_pipeline(config)
 
         mock_ingest.assert_called_once_with(config)
         mock_analyze.assert_called_once_with(config)
         mock_exposure.assert_called_once_with(config)
-        assert call_order == ["ingestion", "analysis", "exposure"]
+        mock_temporal.assert_called_once_with(config)
+        assert call_order == ["ingestion", "analysis", "exposure", "temporal_linking"]
 
 
 # --- TestSendAlert ---

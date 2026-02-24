@@ -26,6 +26,7 @@ EXPECTED_INDEXES = {
     "idx_temporal_links_source_item_id",
     "idx_temporal_links_target_item_id",
     "idx_temporal_links_link_type",
+    "idx_temporal_links_unique_pair",
     "idx_pipeline_runs_started_at",
     "idx_pipeline_runs_run_type",
 }

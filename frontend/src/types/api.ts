@@ -162,10 +162,23 @@ export interface TickerExposureResponse {
   pages: number;
 }
 
+export interface TemporalLinkEntry {
+  id: string;
+  direction: "outgoing" | "incoming";
+  link_type: string;
+  rationale: string;
+  created_at: string;
+  linked_item_id: string;
+  linked_item_title: string;
+  linked_item_source: string;
+  linked_item_timestamp: string;
+}
+
 export interface ItemDetailResponse {
   item: ItemDetail;
   analysis: AnalysisDetail | null;
   exposure: ExposureDetail | null;
+  temporal_links: TemporalLinkEntry[] | null;
 }
 
 export interface PipelineRun {

@@ -294,7 +294,53 @@ def get_item_by_id(database_path: str, item_id: str) -> dict | None:
                 "mapped_at": exp_row["mapped_at"],
             }
 
-    return {"item": item, "analysis": analysis, "exposure": exposure}
+    # Fetch temporal links for this item (outgoing + incoming)
+    temporal_links = None
+    with get_readonly_connection(database_path) as conn:
+        link_rows = conn.execute(
+            "SELECT "
+            "    tl.id, tl.link_type, tl.created_at, tl.rationale, "
+            "    'outgoing' AS direction, "
+            "    i.id AS linked_item_id, "
+            "    i.title AS linked_item_title, "
+            "    i.source_name AS linked_item_source, "
+            "    i.timestamp AS linked_item_timestamp "
+            "FROM temporal_links tl "
+            "JOIN items i ON i.id = tl.target_item_id "
+            "WHERE tl.source_item_id = ? "
+            "UNION ALL "
+            "SELECT "
+            "    tl.id, tl.link_type, tl.created_at, tl.rationale, "
+            "    'incoming' AS direction, "
+            "    i.id AS linked_item_id, "
+            "    i.title AS linked_item_title, "
+            "    i.source_name AS linked_item_source, "
+            "    i.timestamp AS linked_item_timestamp "
+            "FROM temporal_links tl "
+            "JOIN items i ON i.id = tl.source_item_id "
+            "WHERE tl.target_item_id = ? "
+            "ORDER BY linked_item_timestamp DESC "
+            "LIMIT 10",
+            (item_id, item_id),
+        ).fetchall()
+
+    if link_rows:
+        temporal_links = [
+            {
+                "id": r["id"],
+                "direction": r["direction"],
+                "link_type": r["link_type"],
+                "rationale": r["rationale"],
+                "created_at": r["created_at"],
+                "linked_item_id": r["linked_item_id"],
+                "linked_item_title": r["linked_item_title"],
+                "linked_item_source": r["linked_item_source"],
+                "linked_item_timestamp": r["linked_item_timestamp"],
+            }
+            for r in link_rows
+        ]
+
+    return {"item": item, "analysis": analysis, "exposure": exposure, "temporal_links": temporal_links}
 
 
 # ---------------------------------------------------------------------------
