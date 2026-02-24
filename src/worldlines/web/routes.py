@@ -19,11 +19,13 @@ from worldlines.web.models import (
     ItemSummary,
     PipelineRunListResponse,
     StatsResponse,
+    TickerExposureResponse,
 )
 from worldlines.web.queries import (
     get_digest_by_date,
     get_item_by_id,
     get_stats,
+    get_ticker_exposures,
     list_digests,
     list_exposures,
     list_items,
@@ -170,6 +172,28 @@ def exposures(
     pages = math.ceil(total / per_page) if total else 0
     return ExposureListResponse(
         exposures=rows,
+        total=total,
+        page=page,
+        per_page=per_page,
+        pages=pages,
+    )
+
+
+@router.get("/exposures/ticker/{ticker}", response_model=TickerExposureResponse)
+def ticker_exposures(
+    request: Request,
+    ticker: str,
+    page: int = Query(1, ge=1),
+    per_page: int = Query(20, ge=1, le=100),
+) -> TickerExposureResponse:
+    database_path = request.app.state.database_path
+    entries, total = get_ticker_exposures(
+        database_path, ticker, page=page, per_page=per_page
+    )
+    pages = math.ceil(total / per_page) if total else 0
+    return TickerExposureResponse(
+        ticker=ticker,
+        entries=entries,
         total=total,
         page=page,
         per_page=per_page,

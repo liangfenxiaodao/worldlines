@@ -124,6 +124,33 @@ export interface ExposuresParams {
   per_page?: number;
 }
 
+export interface TickerExposureEntry {
+  item_id: string;
+  item_title: string;
+  source_name: string;
+  item_timestamp: string;
+  analysis_id: string;
+  analyzed_at: string;
+  analysis_summary: string;
+  importance: string;
+  mapped_at: string;
+  exposure_type: string;
+  business_role: string;
+  exposure_strength: string;
+  confidence: string;
+  dimensions_implicated: string[];
+  rationale: string;
+}
+
+export interface TickerExposureResponse {
+  ticker: string;
+  entries: TickerExposureEntry[];
+  total: number;
+  page: number;
+  per_page: number;
+  pages: number;
+}
+
 export interface ItemDetailResponse {
   item: ItemDetail;
   analysis: AnalysisDetail | null;

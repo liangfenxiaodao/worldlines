@@ -136,6 +136,36 @@ class ExposureListResponse(BaseModel):
 
 
 # ---------------------------------------------------------------------------
+# Ticker exposures
+# ---------------------------------------------------------------------------
+class TickerExposureEntry(BaseModel):
+    item_id: str
+    item_title: str
+    source_name: str
+    item_timestamp: str
+    analysis_id: str
+    analyzed_at: str
+    analysis_summary: str
+    importance: str
+    mapped_at: str
+    exposure_type: str
+    business_role: str
+    exposure_strength: str
+    confidence: str
+    dimensions_implicated: list[str]
+    rationale: str
+
+
+class TickerExposureResponse(BaseModel):
+    ticker: str
+    entries: list[TickerExposureEntry]
+    total: int
+    page: int
+    per_page: int
+    pages: int
+
+
+# ---------------------------------------------------------------------------
 # Pipeline Runs
 # ---------------------------------------------------------------------------
 class PipelineRun(BaseModel):

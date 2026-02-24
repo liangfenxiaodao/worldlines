@@ -9,6 +9,7 @@ import type {
   PipelineRunListResponse,
   RunsParams,
   StatsResponse,
+  TickerExposureResponse,
 } from "../types/api";
 
 const BASE = "/api/v1";
@@ -62,6 +63,20 @@ export function fetchExposures(params: ExposuresParams = {}): Promise<ExposureLi
   }
   const q = qs.toString();
   return request<ExposureListResponse>(`/exposures${q ? `?${q}` : ""}`);
+}
+
+export function fetchTickerExposures(
+  ticker: string,
+  params: { page?: number; per_page?: number } = {},
+): Promise<TickerExposureResponse> {
+  const qs = new URLSearchParams();
+  for (const [k, v] of Object.entries(params)) {
+    if (v !== undefined) qs.set(k, String(v));
+  }
+  const q = qs.toString();
+  return request<TickerExposureResponse>(
+    `/exposures/ticker/${encodeURIComponent(ticker)}${q ? `?${q}` : ""}`,
+  );
 }
 
 export function fetchRuns(params: RunsParams = {}): Promise<PipelineRunListResponse> {

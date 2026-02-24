@@ -369,6 +369,79 @@ def list_exposures(
 
 
 # ---------------------------------------------------------------------------
+# get_ticker_exposures
+# ---------------------------------------------------------------------------
+def get_ticker_exposures(
+    database_path: str,
+    ticker: str,
+    page: int = 1,
+    per_page: int = 20,
+) -> tuple[list[dict], int]:
+    """Return a paginated list of articles where the given ticker appears."""
+    offset = (page - 1) * per_page
+
+    base_sql = (
+        "FROM exposures e "
+        "JOIN analyses a ON a.id = e.analysis_id "
+        "JOIN items i    ON i.id = a.item_id "
+        "JOIN json_each(e.exposures) t "
+        "  ON json_extract(t.value, '$.ticker') = ?"
+    )
+
+    with get_readonly_connection(database_path) as conn:
+        total = conn.execute(
+            f"SELECT COUNT(*) {base_sql}", (ticker,)
+        ).fetchone()[0]
+
+        rows = conn.execute(
+            f"SELECT "
+            f"  i.id AS item_id, "
+            f"  i.title AS item_title, "
+            f"  i.source_name, "
+            f"  i.timestamp AS item_timestamp, "
+            f"  a.id AS analysis_id, "
+            f"  a.analyzed_at, "
+            f"  a.summary AS analysis_summary, "
+            f"  a.importance, "
+            f"  e.mapped_at, "
+            f"  json_extract(t.value, '$.exposure_type')        AS exposure_type, "
+            f"  json_extract(t.value, '$.business_role')         AS business_role, "
+            f"  json_extract(t.value, '$.exposure_strength')     AS exposure_strength, "
+            f"  json_extract(t.value, '$.confidence')            AS confidence, "
+            f"  json_extract(t.value, '$.dimensions_implicated') AS dimensions_implicated, "
+            f"  json_extract(t.value, '$.rationale')             AS rationale "
+            f"{base_sql} "
+            f"ORDER BY e.mapped_at DESC "
+            f"LIMIT ? OFFSET ?",
+            (ticker, per_page, offset),
+        ).fetchall()
+
+    entries = []
+    for r in rows:
+        raw_dims = r["dimensions_implicated"]
+        dims = json.loads(raw_dims) if raw_dims else []
+        entries.append({
+            "item_id": r["item_id"],
+            "item_title": r["item_title"],
+            "source_name": r["source_name"],
+            "item_timestamp": r["item_timestamp"],
+            "analysis_id": r["analysis_id"],
+            "analyzed_at": r["analyzed_at"],
+            "analysis_summary": r["analysis_summary"],
+            "importance": r["importance"],
+            "mapped_at": r["mapped_at"],
+            "exposure_type": r["exposure_type"],
+            "business_role": r["business_role"],
+            "exposure_strength": r["exposure_strength"],
+            "confidence": r["confidence"],
+            "dimensions_implicated": dims,
+            "rationale": r["rationale"],
+        })
+
+    return entries, total
+
+
+# ---------------------------------------------------------------------------
 # list_pipeline_runs
 # ---------------------------------------------------------------------------
 def list_pipeline_runs(

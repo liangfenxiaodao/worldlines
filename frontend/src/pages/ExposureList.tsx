@@ -49,7 +49,12 @@ function ExposureRow({ record }: { record: ExposureDetail }) {
         {record.exposures.map((exp) => (
           <div key={exp.ticker} className="border-b last:border-0 pb-3 last:pb-0">
             <div className="flex items-center gap-2 flex-wrap mb-1">
-              <span className="font-mono font-semibold text-sm">{exp.ticker}</span>
+              <Link
+                to={`/exposures/${exp.ticker}`}
+                className="font-mono font-semibold text-sm hover:underline"
+              >
+                {exp.ticker}
+              </Link>
               <span className={`text-xs px-2 py-0.5 rounded font-medium ${EXPOSURE_TYPE_COLORS[exp.exposure_type] ?? "bg-gray-100 text-gray-700"}`}>
                 {exp.exposure_type}
               </span>
