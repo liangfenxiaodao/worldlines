@@ -203,6 +203,31 @@ class TickerExposureResponse(BaseModel):
 
 
 # ---------------------------------------------------------------------------
+# Periodic Summaries
+# ---------------------------------------------------------------------------
+class PeriodicSummary(BaseModel):
+    id: str
+    period_label: str
+    window_days: int
+    since: str
+    until: str
+    item_count: int
+    dimension_breakdown: dict[str, int]
+    change_type_distribution: dict[str, int]
+    summary_en: str | None = None
+    summary_zh: str | None = None
+    sent_at: str
+
+
+class PeriodicSummaryListResponse(BaseModel):
+    summaries: list[PeriodicSummary]
+    total: int
+    page: int
+    per_page: int
+    pages: int
+
+
+# ---------------------------------------------------------------------------
 # Pipeline Runs
 # ---------------------------------------------------------------------------
 class PipelineRun(BaseModel):

@@ -18,6 +18,7 @@ from worldlines.web.models import (
     ItemDetailResponse,
     ItemListResponse,
     ItemSummary,
+    PeriodicSummaryListResponse,
     PipelineRunListResponse,
     StatsResponse,
     TickerExposureResponse,
@@ -32,6 +33,7 @@ from worldlines.web.queries import (
     list_digests,
     list_exposures,
     list_items,
+    list_periodic_summaries,
     list_pipeline_runs,
     list_ticker_index,
 )
@@ -211,6 +213,24 @@ def ticker_exposures(
         ticker=ticker,
         synthesis=synthesis,
         entries=entries,
+        total=total,
+        page=page,
+        per_page=per_page,
+        pages=pages,
+    )
+
+
+@router.get("/summaries", response_model=PeriodicSummaryListResponse)
+def summaries(
+    request: Request,
+    page: int = Query(1, ge=1),
+    per_page: int = Query(20, ge=1, le=100),
+) -> PeriodicSummaryListResponse:
+    database_path = request.app.state.database_path
+    rows, total = list_periodic_summaries(database_path, page=page, per_page=per_page)
+    pages = math.ceil(total / per_page) if total else 0
+    return PeriodicSummaryListResponse(
+        summaries=rows,
         total=total,
         page=page,
         per_page=per_page,

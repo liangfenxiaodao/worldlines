@@ -8,6 +8,7 @@ import ItemDetail from "./pages/ItemDetail";
 import ExposureList from "./pages/ExposureList";
 import TickerIndex from "./pages/TickerIndex";
 import TickerDetail from "./pages/TickerDetail";
+import SummaryList from "./pages/SummaryList";
 import Runs from "./pages/Runs";
 
 export default function App() {
@@ -15,6 +16,7 @@ export default function App() {
     <Routes>
       <Route element={<Layout />}>
         <Route index element={<Dashboard />} />
+        <Route path="summaries" element={<SummaryList />} />
         <Route path="digests" element={<DigestList />} />
         <Route path="digests/:date" element={<DigestDetail />} />
         <Route path="items" element={<ItemList />} />

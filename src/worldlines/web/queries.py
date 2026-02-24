@@ -552,6 +552,43 @@ def get_cluster_synthesis(database_path: str, ticker: str) -> dict | None:
 
 
 # ---------------------------------------------------------------------------
+# list_periodic_summaries
+# ---------------------------------------------------------------------------
+def list_periodic_summaries(
+    database_path: str,
+    page: int = 1,
+    per_page: int = 20,
+) -> tuple[list[dict], int]:
+    """Return a paginated list of periodic summaries, newest first."""
+    offset = (page - 1) * per_page
+    with get_readonly_connection(database_path) as conn:
+        total = conn.execute("SELECT COUNT(*) FROM periodic_summaries").fetchone()[0]
+        rows = conn.execute(
+            "SELECT id, period_label, window_days, since, until, item_count, "
+            "dimension_breakdown, change_type_distribution, "
+            "summary_en, summary_zh, sent_at "
+            "FROM periodic_summaries ORDER BY sent_at DESC LIMIT ? OFFSET ?",
+            (per_page, offset),
+        ).fetchall()
+    return [
+        {
+            "id": r["id"],
+            "period_label": r["period_label"],
+            "window_days": r["window_days"],
+            "since": r["since"],
+            "until": r["until"],
+            "item_count": r["item_count"],
+            "dimension_breakdown": json.loads(r["dimension_breakdown"]),
+            "change_type_distribution": json.loads(r["change_type_distribution"]),
+            "summary_en": r["summary_en"],
+            "summary_zh": r["summary_zh"],
+            "sent_at": r["sent_at"],
+        }
+        for r in rows
+    ], total
+
+
+# ---------------------------------------------------------------------------
 # list_pipeline_runs
 # ---------------------------------------------------------------------------
 def list_pipeline_runs(

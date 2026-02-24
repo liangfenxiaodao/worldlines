@@ -6,6 +6,7 @@ import type {
   ItemDetailResponse,
   ItemListResponse,
   ItemsParams,
+  PeriodicSummaryListResponse,
   PipelineRunListResponse,
   RunsParams,
   StatsResponse,
@@ -81,6 +82,15 @@ export function fetchTickerExposures(
   const q = qs.toString();
   return request<TickerExposureResponse>(
     `/exposures/ticker/${encodeURIComponent(ticker)}${q ? `?${q}` : ""}`,
+  );
+}
+
+export function fetchSummaries(
+  page = 1,
+  perPage = 20,
+): Promise<PeriodicSummaryListResponse> {
+  return request<PeriodicSummaryListResponse>(
+    `/summaries?page=${page}&per_page=${perPage}`,
   );
 }
 

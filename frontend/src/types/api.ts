@@ -191,6 +191,28 @@ export interface ItemDetailResponse {
   temporal_links: TemporalLinkEntry[] | null;
 }
 
+export interface PeriodicSummary {
+  id: string;
+  period_label: string;
+  window_days: number;
+  since: string;
+  until: string;
+  item_count: number;
+  dimension_breakdown: Record<string, number>;
+  change_type_distribution: Record<string, number>;
+  summary_en: string | null;
+  summary_zh: string | null;
+  sent_at: string;
+}
+
+export interface PeriodicSummaryListResponse {
+  summaries: PeriodicSummary[];
+  total: number;
+  page: number;
+  per_page: number;
+  pages: number;
+}
+
 export interface PipelineRun {
   id: string;
   run_type: string;
