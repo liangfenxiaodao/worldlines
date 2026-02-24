@@ -11,6 +11,7 @@ from fastapi.responses import JSONResponse
 
 from worldlines.storage.connection import get_connection
 from worldlines.web.models import (
+    ClusterSynthesis,
     DigestDetail,
     DigestListResponse,
     ExposureListResponse,
@@ -23,6 +24,7 @@ from worldlines.web.models import (
     TickerIndexResponse,
 )
 from worldlines.web.queries import (
+    get_cluster_synthesis,
     get_digest_by_date,
     get_item_by_id,
     get_stats,
@@ -203,8 +205,11 @@ def ticker_exposures(
         database_path, ticker, page=page, per_page=per_page
     )
     pages = math.ceil(total / per_page) if total else 0
+    synthesis_data = get_cluster_synthesis(database_path, ticker)
+    synthesis = ClusterSynthesis(**synthesis_data) if synthesis_data is not None else None
     return TickerExposureResponse(
         ticker=ticker,
+        synthesis=synthesis,
         entries=entries,
         total=total,
         page=page,

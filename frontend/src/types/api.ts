@@ -124,6 +124,15 @@ export interface ExposuresParams {
   per_page?: number;
 }
 
+export interface ClusterSynthesis {
+  id: string;
+  ticker: string;
+  item_count: number;
+  synthesis: string;
+  synthesized_at: string;
+  synthesis_version: string;
+}
+
 export interface TickerIndexEntry {
   ticker: string;
   article_count: number;
@@ -155,6 +164,7 @@ export interface TickerExposureEntry {
 
 export interface TickerExposureResponse {
   ticker: string;
+  synthesis: ClusterSynthesis | null;
   entries: TickerExposureEntry[];
   total: number;
   page: number;

@@ -77,6 +77,16 @@ export default function TickerDetail() {
         {data.total} article{data.total !== 1 ? "s" : ""}
       </p>
 
+      {data.synthesis && (
+        <div className="bg-white rounded shadow px-5 py-4 mb-6">
+          <h2 className="text-sm font-medium text-gray-700 mb-2">Structural synthesis</h2>
+          <p className="text-sm">{data.synthesis.synthesis}</p>
+          <div className="text-xs text-gray-400 mt-2">
+            {data.synthesis.item_count} observations · synthesized {data.synthesis.synthesized_at}
+          </div>
+        </div>
+      )}
+
       {data.entries.length === 0 ? (
         <p className="text-gray-500">No exposure records found for {data.ticker}.</p>
       ) : (

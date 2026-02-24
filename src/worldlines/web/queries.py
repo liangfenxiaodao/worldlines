@@ -528,6 +528,29 @@ def get_ticker_exposures(
 
 
 # ---------------------------------------------------------------------------
+# get_cluster_synthesis
+# ---------------------------------------------------------------------------
+def get_cluster_synthesis(database_path: str, ticker: str) -> dict | None:
+    """Return cluster synthesis for a ticker, or None."""
+    with get_readonly_connection(database_path) as conn:
+        row = conn.execute(
+            "SELECT id, ticker, item_count, synthesis, synthesized_at, synthesis_version "
+            "FROM cluster_syntheses WHERE ticker = ?",
+            (ticker,),
+        ).fetchone()
+    if row is None:
+        return None
+    return {
+        "id": row["id"],
+        "ticker": row["ticker"],
+        "item_count": row["item_count"],
+        "synthesis": row["synthesis"],
+        "synthesized_at": row["synthesized_at"],
+        "synthesis_version": row["synthesis_version"],
+    }
+
+
+# ---------------------------------------------------------------------------
 # list_pipeline_runs
 # ---------------------------------------------------------------------------
 def list_pipeline_runs(

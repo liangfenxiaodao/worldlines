@@ -165,6 +165,15 @@ class TickerIndexResponse(BaseModel):
 # ---------------------------------------------------------------------------
 # Ticker exposures
 # ---------------------------------------------------------------------------
+class ClusterSynthesis(BaseModel):
+    id: str
+    ticker: str
+    item_count: int
+    synthesis: str
+    synthesized_at: str
+    synthesis_version: str
+
+
 class TickerExposureEntry(BaseModel):
     item_id: str
     item_title: str
@@ -185,6 +194,7 @@ class TickerExposureEntry(BaseModel):
 
 class TickerExposureResponse(BaseModel):
     ticker: str
+    synthesis: ClusterSynthesis | None = None
     entries: list[TickerExposureEntry]
     total: int
     page: int

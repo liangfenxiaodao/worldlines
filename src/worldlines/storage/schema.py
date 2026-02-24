@@ -129,7 +129,7 @@ CREATE INDEX IF NOT EXISTS idx_digests_sent_at ON digests(sent_at);
 -- Pipeline run tracking
 CREATE TABLE IF NOT EXISTS pipeline_runs (
     id          TEXT PRIMARY KEY,
-    run_type    TEXT NOT NULL CHECK (run_type IN ('ingestion', 'analysis', 'digest', 'backup', 'exposure', 'temporal_linking')),
+    run_type    TEXT NOT NULL CHECK (run_type IN ('ingestion', 'analysis', 'digest', 'backup', 'exposure', 'temporal_linking', 'cluster_synthesis')),
     started_at  TEXT NOT NULL,
     finished_at TEXT NOT NULL,
     status      TEXT NOT NULL CHECK (status IN ('success', 'error')),
@@ -161,6 +161,18 @@ CREATE TABLE IF NOT EXISTS exposure_errors (
     last_error          TEXT NOT NULL,
     last_attempted_at   TEXT NOT NULL
 );
+
+-- Cluster-level synthesis per ticker
+CREATE TABLE IF NOT EXISTS cluster_syntheses (
+    id                  TEXT PRIMARY KEY,
+    ticker              TEXT NOT NULL UNIQUE,
+    item_ids            TEXT NOT NULL,        -- JSON array of item IDs, sorted
+    item_count          INTEGER NOT NULL,
+    synthesis           TEXT NOT NULL,
+    synthesized_at      TEXT NOT NULL,
+    synthesis_version   TEXT NOT NULL
+);
+CREATE INDEX IF NOT EXISTS idx_cluster_syntheses_ticker ON cluster_syntheses(ticker);
 """
 
 
@@ -296,6 +308,35 @@ def _migrate_pipeline_runs_add_temporal_linking(conn: sqlite3.Connection) -> Non
         """)
 
 
+def _migrate_pipeline_runs_add_cluster_synthesis(conn: sqlite3.Connection) -> None:
+    """Recreate pipeline_runs table to add 'cluster_synthesis' to run_type CHECK constraint."""
+    try:
+        conn.execute(
+            "INSERT INTO pipeline_runs (id, run_type, started_at, finished_at, status, result) "
+            "VALUES ('__migration_test__', 'cluster_synthesis', '', '', 'success', '{}')"
+        )
+        conn.execute("DELETE FROM pipeline_runs WHERE id = '__migration_test__'")
+    except sqlite3.IntegrityError:
+        conn.executescript("""
+            CREATE TABLE pipeline_runs_new (
+                id          TEXT PRIMARY KEY,
+                run_type    TEXT NOT NULL CHECK (run_type IN (
+                                'ingestion', 'analysis', 'digest', 'backup',
+                                'exposure', 'temporal_linking', 'cluster_synthesis')),
+                started_at  TEXT NOT NULL,
+                finished_at TEXT NOT NULL,
+                status      TEXT NOT NULL CHECK (status IN ('success', 'error')),
+                result      TEXT NOT NULL,
+                error       TEXT
+            );
+            INSERT INTO pipeline_runs_new SELECT * FROM pipeline_runs;
+            DROP TABLE pipeline_runs;
+            ALTER TABLE pipeline_runs_new RENAME TO pipeline_runs;
+            CREATE INDEX IF NOT EXISTS idx_pipeline_runs_started_at ON pipeline_runs(started_at);
+            CREATE INDEX IF NOT EXISTS idx_pipeline_runs_run_type ON pipeline_runs(run_type);
+        """)
+
+
 def init_db(database_path: str) -> None:
     """Create all tables and indexes if they do not already exist."""
     with get_connection(database_path) as conn:
@@ -307,4 +348,5 @@ def init_db(database_path: str) -> None:
         _migrate_pipeline_runs_add_exposure(conn)
         _migrate_temporal_links_unique_index(conn)
         _migrate_pipeline_runs_add_temporal_linking(conn)
+        _migrate_pipeline_runs_add_cluster_synthesis(conn)
     logger.info("Database initialized at %s", database_path)

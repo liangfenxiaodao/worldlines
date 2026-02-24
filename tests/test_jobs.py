@@ -584,11 +584,12 @@ class TestRunDigest:
 
 
 class TestRunPipeline:
+    @patch("worldlines.jobs.run_cluster_synthesis")
     @patch("worldlines.jobs.run_temporal_linking")
     @patch("worldlines.jobs.run_exposure_mapping")
     @patch("worldlines.jobs.run_analysis")
     @patch("worldlines.jobs.run_ingestion")
-    def test_calls_ingestion_analysis_exposure(self, mock_ingest, mock_analyze, mock_exposure, mock_temporal, tmp_path):
+    def test_calls_ingestion_analysis_exposure(self, mock_ingest, mock_analyze, mock_exposure, mock_temporal, mock_synthesis, tmp_path):
         config = _make_config(tmp_path)
 
         call_order = []
@@ -596,6 +597,7 @@ class TestRunPipeline:
         mock_analyze.side_effect = lambda c: call_order.append("analysis")
         mock_exposure.side_effect = lambda c: call_order.append("exposure")
         mock_temporal.side_effect = lambda c: call_order.append("temporal_linking")
+        mock_synthesis.side_effect = lambda c: call_order.append("cluster_synthesis")
 
         run_pipeline(config)
 
@@ -603,7 +605,8 @@ class TestRunPipeline:
         mock_analyze.assert_called_once_with(config)
         mock_exposure.assert_called_once_with(config)
         mock_temporal.assert_called_once_with(config)
-        assert call_order == ["ingestion", "analysis", "exposure", "temporal_linking"]
+        mock_synthesis.assert_called_once_with(config)
+        assert call_order == ["ingestion", "analysis", "exposure", "temporal_linking", "cluster_synthesis"]
 
 
 # --- TestSendAlert ---
