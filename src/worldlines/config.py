@@ -44,6 +44,10 @@ class Config:
     telegram_parse_mode: str = "HTML"
     telegram_max_retries: int = 3
 
+    # Optional — Periodic summary
+    periodic_summary_schedule_cron: str = "0 10 * * 1"  # Monday 10:00 UTC
+    periodic_summary_window_days: int = 7
+
     # Optional — Backup
     backup_dir: str = "/data/backups"
     backup_retention_days: int = 7
@@ -106,6 +110,12 @@ def load_config(env_path: str | Path | None = None) -> Config:
         digest_max_items=int(os.environ.get("DIGEST_MAX_ITEMS", "20")),
         telegram_parse_mode=os.environ.get("TELEGRAM_PARSE_MODE", "HTML"),
         telegram_max_retries=int(os.environ.get("TELEGRAM_MAX_RETRIES", "3")),
+        periodic_summary_schedule_cron=os.environ.get(
+            "PERIODIC_SUMMARY_SCHEDULE_CRON", "0 10 * * 1"
+        ),
+        periodic_summary_window_days=int(
+            os.environ.get("PERIODIC_SUMMARY_WINDOW_DAYS", "7")
+        ),
         # Optional — Backup
         backup_dir=os.environ.get("BACKUP_DIR", "/data/backups"),
         backup_retention_days=int(os.environ.get("BACKUP_RETENTION_DAYS", "7")),

@@ -14,6 +14,7 @@ from zoneinfo import ZoneInfo
 from worldlines.analysis.classifier import classify_item
 from worldlines.exposure.mapper import map_exposures
 from worldlines.config import Config
+from worldlines.digest.periodic import generate_periodic_summary
 from worldlines.synthesis.synthesizer import synthesize_cluster
 from worldlines.digest.digest import generate_digest
 from worldlines.digest.telegram import send_message
@@ -702,6 +703,67 @@ def run_cluster_synthesis(config: Config) -> None:
         config.database_path, "cluster_synthesis", started_at,
         {"tickers_found": tickers_found, "synthesized": synthesized, "skipped": skipped, "errors": errors},
         error=error_msg,
+    )
+
+
+def run_periodic_summary(config: Config) -> None:
+    """Generate and deliver a periodic structural summary over the configured window."""
+    started_at = datetime.now(timezone.utc).isoformat()
+    error_msg = None
+    run_result: dict = {}
+
+    try:
+        window_days = config.periodic_summary_window_days
+        now_utc = datetime.now(timezone.utc)
+        # Align window to day boundaries
+        until_dt = now_utc.replace(hour=0, minute=0, second=0, microsecond=0)
+        since_dt = until_dt - timedelta(days=window_days)
+        since = since_dt.isoformat()
+        until = until_dt.isoformat()
+        # Idempotency key: end date + window size
+        period_label = f"{until_dt.date().isoformat()}:{window_days}d"
+
+        logger.info(
+            "Generating periodic summary: period=%s, since=%s, until=%s",
+            period_label, since, until,
+        )
+
+        result = generate_periodic_summary(
+            period_label,
+            window_days,
+            since,
+            until,
+            database_path=config.database_path,
+            bot_token=config.telegram_bot_token,
+            chat_id=config.telegram_chat_id,
+            api_key=config.llm_api_key,
+            model=config.llm_model,
+            parse_mode=config.telegram_parse_mode,
+            max_retries=config.telegram_max_retries,
+        )
+
+        logger.info(
+            "Periodic summary: status=%s, error=%s",
+            result.delivery_status, result.error,
+        )
+
+        run_result = {
+            "period_label": period_label,
+            "since": since,
+            "until": until,
+            "delivery_status": result.delivery_status,
+        }
+
+        if result.error:
+            error_msg = result.error
+            _send_alert(config, f"Periodic summary delivery issue: {result.error}")
+    except Exception:
+        logger.exception("Periodic summary failed")
+        error_msg = "Periodic summary failed (see logs)"
+        _send_alert(config, "Periodic summary pipeline failed. Check logs for details.")
+
+    _record_run(
+        config.database_path, "periodic_summary", started_at, run_result, error=error_msg,
     )
 
 

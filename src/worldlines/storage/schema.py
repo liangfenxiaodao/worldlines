@@ -130,7 +130,7 @@ CREATE INDEX IF NOT EXISTS idx_digests_sent_at ON digests(sent_at);
 -- Pipeline run tracking
 CREATE TABLE IF NOT EXISTS pipeline_runs (
     id          TEXT PRIMARY KEY,
-    run_type    TEXT NOT NULL CHECK (run_type IN ('ingestion', 'analysis', 'digest', 'backup', 'exposure', 'temporal_linking', 'cluster_synthesis')),
+    run_type    TEXT NOT NULL CHECK (run_type IN ('ingestion', 'analysis', 'digest', 'backup', 'exposure', 'temporal_linking', 'cluster_synthesis', 'periodic_summary')),
     started_at  TEXT NOT NULL,
     finished_at TEXT NOT NULL,
     status      TEXT NOT NULL CHECK (status IN ('success', 'error')),
@@ -162,6 +162,24 @@ CREATE TABLE IF NOT EXISTS exposure_errors (
     last_error          TEXT NOT NULL,
     last_attempted_at   TEXT NOT NULL
 );
+
+-- Periodic (weekly/monthly) structural summaries
+CREATE TABLE IF NOT EXISTS periodic_summaries (
+    id                      TEXT PRIMARY KEY,
+    period_label            TEXT NOT NULL UNIQUE,  -- e.g. "2026-02-24:7d"
+    window_days             INTEGER NOT NULL,
+    since                   TEXT NOT NULL,
+    until                   TEXT NOT NULL,
+    item_count              INTEGER NOT NULL,
+    dimension_breakdown     TEXT NOT NULL,          -- JSON object
+    change_type_distribution TEXT NOT NULL,         -- JSON object
+    summary_en              TEXT,
+    summary_zh              TEXT,
+    message_text            TEXT NOT NULL,
+    sent_at                 TEXT NOT NULL,
+    telegram_message_ids    TEXT NOT NULL           -- JSON array
+);
+CREATE INDEX IF NOT EXISTS idx_periodic_summaries_sent_at ON periodic_summaries(sent_at);
 
 -- Cluster-level synthesis per ticker
 CREATE TABLE IF NOT EXISTS cluster_syntheses (
@@ -314,6 +332,36 @@ _TICKER_ALIASES: dict[str, str] = {
 }
 
 
+def _migrate_pipeline_runs_add_periodic_summary(conn: sqlite3.Connection) -> None:
+    """Recreate pipeline_runs table to add 'periodic_summary' to run_type CHECK constraint."""
+    try:
+        conn.execute(
+            "INSERT INTO pipeline_runs (id, run_type, started_at, finished_at, status, result) "
+            "VALUES ('__migration_test__', 'periodic_summary', '', '', 'success', '{}')"
+        )
+        conn.execute("DELETE FROM pipeline_runs WHERE id = '__migration_test__'")
+    except sqlite3.IntegrityError:
+        conn.executescript("""
+            CREATE TABLE pipeline_runs_new (
+                id          TEXT PRIMARY KEY,
+                run_type    TEXT NOT NULL CHECK (run_type IN (
+                                'ingestion', 'analysis', 'digest', 'backup',
+                                'exposure', 'temporal_linking', 'cluster_synthesis',
+                                'periodic_summary')),
+                started_at  TEXT NOT NULL,
+                finished_at TEXT NOT NULL,
+                status      TEXT NOT NULL CHECK (status IN ('success', 'error')),
+                result      TEXT NOT NULL,
+                error       TEXT
+            );
+            INSERT INTO pipeline_runs_new SELECT * FROM pipeline_runs;
+            DROP TABLE pipeline_runs;
+            ALTER TABLE pipeline_runs_new RENAME TO pipeline_runs;
+            CREATE INDEX IF NOT EXISTS idx_pipeline_runs_started_at ON pipeline_runs(started_at);
+            CREATE INDEX IF NOT EXISTS idx_pipeline_runs_run_type ON pipeline_runs(run_type);
+        """)
+
+
 def _migrate_normalize_ticker_aliases(conn: sqlite3.Connection) -> None:
     """Rewrite existing exposure rows to replace aliased tickers with canonical symbols.
 
@@ -400,5 +448,6 @@ def init_db(database_path: str) -> None:
         _migrate_temporal_links_unique_index(conn)
         _migrate_pipeline_runs_add_temporal_linking(conn)
         _migrate_pipeline_runs_add_cluster_synthesis(conn)
+        _migrate_pipeline_runs_add_periodic_summary(conn)
         _migrate_normalize_ticker_aliases(conn)
     logger.info("Database initialized at %s", database_path)
