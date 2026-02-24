@@ -288,6 +288,7 @@ def get_item_by_id(database_path: str, item_id: str) -> dict | None:
             exposure = {
                 "id": exp_row["id"],
                 "analysis_id": exp_row["analysis_id"],
+                "item_id": row["id"],
                 "exposures": json.loads(exp_row["exposures"]),
                 "skipped_reason": exp_row["skipped_reason"],
                 "mapped_at": exp_row["mapped_at"],
@@ -347,8 +348,8 @@ def list_exposures(
         ).fetchone()[0]
 
         rows = conn.execute(
-            f"SELECT e.id, e.analysis_id, e.exposures, e.skipped_reason, e.mapped_at "
-            f"FROM exposures e {where_clause} "
+            f"SELECT e.id, e.analysis_id, a.item_id, e.exposures, e.skipped_reason, e.mapped_at "
+            f"FROM exposures e JOIN analyses a ON a.id = e.analysis_id {where_clause} "
             f"ORDER BY e.mapped_at DESC LIMIT ? OFFSET ?",
             [*params, per_page, offset],
         ).fetchall()
@@ -358,6 +359,7 @@ def list_exposures(
         exposures.append({
             "id": r["id"],
             "analysis_id": r["analysis_id"],
+            "item_id": r["item_id"],
             "exposures": json.loads(r["exposures"]),
             "skipped_reason": r["skipped_reason"],
             "mapped_at": r["mapped_at"],

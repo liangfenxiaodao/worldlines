@@ -112,6 +112,7 @@ class ExposureEntry(BaseModel):
 class ExposureDetail(BaseModel):
     id: str
     analysis_id: str
+    item_id: str
     exposures: list[ExposureEntry]
     skipped_reason: str | None = None
     mapped_at: str

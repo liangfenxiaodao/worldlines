@@ -75,7 +75,7 @@ function ExposureRow({ record }: { record: ExposureDetail }) {
       <div className="text-xs text-gray-400 mt-3 flex items-center justify-between">
         <span>Mapped {record.mapped_at}</span>
         <Link
-          to={`/items/${record.analysis_id}`}
+          to={`/items/${record.item_id}`}
           className="hover:underline text-gray-500"
         >
           View analysis →

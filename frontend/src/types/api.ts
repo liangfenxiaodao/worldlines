@@ -101,6 +101,7 @@ export interface ExposureEntry {
 export interface ExposureDetail {
   id: string;
   analysis_id: string;
+  item_id: string;
   exposures: ExposureEntry[];
   skipped_reason: string | null;
   mapped_at: string;
