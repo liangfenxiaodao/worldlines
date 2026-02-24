@@ -20,6 +20,7 @@ from worldlines.web.models import (
     PipelineRunListResponse,
     StatsResponse,
     TickerExposureResponse,
+    TickerIndexResponse,
 )
 from worldlines.web.queries import (
     get_digest_by_date,
@@ -30,6 +31,7 @@ from worldlines.web.queries import (
     list_exposures,
     list_items,
     list_pipeline_runs,
+    list_ticker_index,
 )
 
 logger = logging.getLogger(__name__)
@@ -177,6 +179,16 @@ def exposures(
         per_page=per_page,
         pages=pages,
     )
+
+
+@router.get("/exposures/tickers", response_model=TickerIndexResponse)
+def ticker_index(
+    request: Request,
+    sort: str = "count",
+) -> TickerIndexResponse:
+    database_path = request.app.state.database_path
+    entries = list_ticker_index(database_path, sort=sort)
+    return TickerIndexResponse(tickers=entries, total=len(entries))
 
 
 @router.get("/exposures/ticker/{ticker}", response_model=TickerExposureResponse)

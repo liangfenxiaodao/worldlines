@@ -134,7 +134,12 @@ export default function ExposureList() {
   return (
     <div>
       <div className="flex items-center justify-between mb-4 flex-wrap gap-3">
-        <h1 className="text-2xl font-semibold">Structural Exposures</h1>
+        <div className="flex items-baseline gap-4">
+          <h1 className="text-2xl font-semibold">Structural Exposures</h1>
+          <Link to="/exposures/tickers" className="text-sm text-gray-500 hover:underline">
+            Ticker index →
+          </Link>
+        </div>
         <div className="flex gap-2 flex-wrap">
           <input
             type="text"

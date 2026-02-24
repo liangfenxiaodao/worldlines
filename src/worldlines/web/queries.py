@@ -369,6 +369,46 @@ def list_exposures(
 
 
 # ---------------------------------------------------------------------------
+# list_ticker_index
+# ---------------------------------------------------------------------------
+_TICKER_SORT = {
+    "count": "article_count DESC, ticker ASC",
+    "ticker": "ticker ASC",
+    "recent": "last_mapped_at DESC, ticker ASC",
+}
+
+
+def list_ticker_index(
+    database_path: str,
+    sort: str = "count",
+) -> list[dict]:
+    """Return every ticker seen in exposures with article count and last mapped date."""
+    order = _TICKER_SORT.get(sort, _TICKER_SORT["count"])
+
+    with get_readonly_connection(database_path) as conn:
+        rows = conn.execute(
+            f"SELECT "
+            f"  json_extract(t.value, '$.ticker') AS ticker, "
+            f"  COUNT(*) AS article_count, "
+            f"  MAX(e.mapped_at) AS last_mapped_at "
+            f"FROM exposures e "
+            f"JOIN json_each(e.exposures) t "
+            f"WHERE json_extract(t.value, '$.ticker') IS NOT NULL "
+            f"GROUP BY ticker "
+            f"ORDER BY {order}"
+        ).fetchall()
+
+    return [
+        {
+            "ticker": r["ticker"],
+            "article_count": r["article_count"],
+            "last_mapped_at": r["last_mapped_at"],
+        }
+        for r in rows
+    ]
+
+
+# ---------------------------------------------------------------------------
 # get_ticker_exposures
 # ---------------------------------------------------------------------------
 def get_ticker_exposures(

@@ -10,6 +10,7 @@ import type {
   RunsParams,
   StatsResponse,
   TickerExposureResponse,
+  TickerIndexResponse,
 } from "../types/api";
 
 const BASE = "/api/v1";
@@ -63,6 +64,10 @@ export function fetchExposures(params: ExposuresParams = {}): Promise<ExposureLi
   }
   const q = qs.toString();
   return request<ExposureListResponse>(`/exposures${q ? `?${q}` : ""}`);
+}
+
+export function fetchTickerIndex(sort = "count"): Promise<TickerIndexResponse> {
+  return request<TickerIndexResponse>(`/exposures/tickers?sort=${encodeURIComponent(sort)}`);
 }
 
 export function fetchTickerExposures(

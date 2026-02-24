@@ -136,6 +136,20 @@ class ExposureListResponse(BaseModel):
 
 
 # ---------------------------------------------------------------------------
+# Ticker index
+# ---------------------------------------------------------------------------
+class TickerIndexEntry(BaseModel):
+    ticker: str
+    article_count: int
+    last_mapped_at: str
+
+
+class TickerIndexResponse(BaseModel):
+    tickers: list[TickerIndexEntry]
+    total: int
+
+
+# ---------------------------------------------------------------------------
 # Ticker exposures
 # ---------------------------------------------------------------------------
 class TickerExposureEntry(BaseModel):

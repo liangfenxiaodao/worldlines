@@ -124,6 +124,17 @@ export interface ExposuresParams {
   per_page?: number;
 }
 
+export interface TickerIndexEntry {
+  ticker: string;
+  article_count: number;
+  last_mapped_at: string;
+}
+
+export interface TickerIndexResponse {
+  tickers: TickerIndexEntry[];
+  total: number;
+}
+
 export interface TickerExposureEntry {
   item_id: string;
   item_title: string;
