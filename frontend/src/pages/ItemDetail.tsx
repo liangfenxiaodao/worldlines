@@ -186,13 +186,6 @@ export default function ItemDetail() {
         </div>
       )}
 
-      {exposure && exposure.skipped_reason && (
-        <div className="bg-white rounded shadow px-5 py-4 mt-6">
-          <h2 className="text-sm font-medium text-gray-700 mb-1">Structural Exposures</h2>
-          <p className="text-sm text-gray-500 italic">{exposure.skipped_reason}</p>
-          <div className="text-xs text-gray-400 mt-2">Mapped {exposure.mapped_at}</div>
-        </div>
-      )}
 
       {data.temporal_links && data.temporal_links.length > 0 && (
         <div className="bg-white rounded shadow px-5 py-4 mt-6">
