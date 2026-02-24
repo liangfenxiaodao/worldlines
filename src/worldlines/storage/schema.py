@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+import json
 import logging
 import sqlite3
 
@@ -308,6 +309,56 @@ def _migrate_pipeline_runs_add_temporal_linking(conn: sqlite3.Connection) -> Non
         """)
 
 
+_TICKER_ALIASES: dict[str, str] = {
+    "GOOG": "GOOGL",
+}
+
+
+def _migrate_normalize_ticker_aliases(conn: sqlite3.Connection) -> None:
+    """Rewrite existing exposure rows to replace aliased tickers with canonical symbols.
+
+    Also removes any cluster_syntheses rows keyed to a deprecated ticker so they
+    will be regenerated under the canonical ticker on the next pipeline run.
+    """
+    deprecated = list(_TICKER_ALIASES.keys())
+    if not deprecated:
+        return
+
+    # Find exposures that contain any deprecated ticker in their JSON
+    like_clauses = " OR ".join("exposures LIKE ?" for _ in deprecated)
+    like_params = [f'%"ticker": "{t}"%' for t in deprecated]
+
+    rows = conn.execute(
+        f"SELECT id, exposures FROM exposures WHERE {like_clauses}",  # noqa: S608
+        like_params,
+    ).fetchall()
+
+    for row in rows:
+        try:
+            exps = json.loads(row["exposures"])
+            changed = False
+            for exp in exps:
+                if isinstance(exp, dict):
+                    t = exp.get("ticker")
+                    if t in _TICKER_ALIASES:
+                        exp["ticker"] = _TICKER_ALIASES[t]
+                        changed = True
+            if changed:
+                conn.execute(
+                    "UPDATE exposures SET exposures = ? WHERE id = ?",
+                    (json.dumps(exps), row["id"]),
+                )
+        except (json.JSONDecodeError, TypeError):
+            pass
+
+    # Drop stale cluster_syntheses rows for deprecated tickers so they regenerate
+    placeholders = ",".join("?" for _ in deprecated)
+    conn.execute(
+        f"DELETE FROM cluster_syntheses WHERE ticker IN ({placeholders})",  # noqa: S608
+        deprecated,
+    )
+
+
 def _migrate_pipeline_runs_add_cluster_synthesis(conn: sqlite3.Connection) -> None:
     """Recreate pipeline_runs table to add 'cluster_synthesis' to run_type CHECK constraint."""
     try:
@@ -349,4 +400,5 @@ def init_db(database_path: str) -> None:
         _migrate_temporal_links_unique_index(conn)
         _migrate_pipeline_runs_add_temporal_linking(conn)
         _migrate_pipeline_runs_add_cluster_synthesis(conn)
+        _migrate_normalize_ticker_aliases(conn)
     logger.info("Database initialized at %s", database_path)

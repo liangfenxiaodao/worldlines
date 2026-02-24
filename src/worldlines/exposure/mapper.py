@@ -18,6 +18,22 @@ from worldlines.storage.connection import get_connection
 
 logger = logging.getLogger(__name__)
 
+# Canonical aliases: map each key to the primary ticker.
+# GOOG (Class C, no vote) → GOOGL (Class A, standard listing)
+TICKER_ALIASES: dict[str, str] = {
+    "GOOG": "GOOGL",
+}
+
+
+def _normalize_tickers(exposures: list) -> list:
+    """Replace aliased ticker symbols with their canonical equivalents."""
+    for exp in exposures:
+        if isinstance(exp, dict):
+            t = exp.get("ticker")
+            if t in TICKER_ALIASES:
+                exp["ticker"] = TICKER_ALIASES[t]
+    return exposures
+
 
 @dataclass(frozen=True)
 class ExposureResult:
@@ -118,11 +134,12 @@ def map_exposures(
     exposure_id = str(uuid.uuid4())
     now = datetime.now(timezone.utc).isoformat()
     skipped_reason = data.get("skipped_reason")
+    normalised_exposures = _normalize_tickers(data["exposures"])
 
     record = {
         "id": exposure_id,
         "analysis_id": analysis_id,
-        "exposures": data["exposures"],
+        "exposures": normalised_exposures,
         "skipped_reason": skipped_reason,
         "mapped_at": now,
     }

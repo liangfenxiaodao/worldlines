@@ -358,7 +358,8 @@ def list_exposures(
 ) -> tuple[list[dict], int]:
     """Return a paginated list of exposure records, newest first."""
     offset = (page - 1) * per_page
-    conditions: list[str] = []
+    # Always exclude skipped records — they carry no ticker data and are internal state
+    conditions: list[str] = ["e.skipped_reason IS NULL"]
     params: list[object] = []
 
     if ticker is not None:
