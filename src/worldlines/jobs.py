@@ -68,6 +68,72 @@ def _send_alert(config: Config, message: str) -> None:
         logger.exception("Failed to send alert")
 
 
+_STALL_MIN_RUNS = 3  # require at least this many historical runs before alerting
+
+
+def _record_source_failure(database_path: str, adapter_name: str, error_msg: str) -> int:
+    """Record a source adapter fetch failure. Returns updated consecutive_failures count."""
+    now = datetime.now(timezone.utc).isoformat()
+    with get_connection(database_path) as conn:
+        conn.execute(
+            "INSERT INTO source_errors "
+            "(adapter_name, consecutive_failures, last_error, last_failed_at) "
+            "VALUES (?, 1, ?, ?) "
+            "ON CONFLICT(adapter_name) DO UPDATE SET "
+            "consecutive_failures = consecutive_failures + 1, "
+            "last_error = ?, last_failed_at = ?",
+            (adapter_name, error_msg, now, error_msg, now),
+        )
+        row = conn.execute(
+            "SELECT consecutive_failures FROM source_errors WHERE adapter_name = ?",
+            (adapter_name,),
+        ).fetchone()
+    return row["consecutive_failures"] if row else 1
+
+
+def _record_source_success(database_path: str, adapter_name: str) -> None:
+    """Reset consecutive failure count for a source adapter after a successful fetch."""
+    now = datetime.now(timezone.utc).isoformat()
+    with get_connection(database_path) as conn:
+        conn.execute(
+            "INSERT INTO source_errors "
+            "(adapter_name, consecutive_failures, last_succeeded_at) "
+            "VALUES (?, 0, ?) "
+            "ON CONFLICT(adapter_name) DO UPDATE SET "
+            "consecutive_failures = 0, last_succeeded_at = ?",
+            (adapter_name, now, now),
+        )
+
+
+def _check_ingestion_stall(config: Config) -> None:
+    """Alert if recent ingestion volume has dropped below the configured threshold."""
+    cutoff = (
+        datetime.now(timezone.utc) - timedelta(hours=config.ingestion_stall_hours)
+    ).isoformat()
+    with get_connection(config.database_path) as conn:
+        row = conn.execute(
+            "SELECT COUNT(*) AS run_count, "
+            "COALESCE(SUM(json_extract(result, '$.items_new')), 0) AS total_new "
+            "FROM pipeline_runs "
+            "WHERE run_type = 'ingestion' AND started_at >= ?",
+            (cutoff,),
+        ).fetchone()
+    run_count = row["run_count"] if row else 0
+    total_new = row["total_new"] if row else 0
+
+    if run_count < _STALL_MIN_RUNS:
+        return  # not enough history to establish a baseline
+
+    if total_new < config.ingestion_stall_min_items:
+        _send_alert(
+            config,
+            f"[ALERT] Ingestion stall: only {total_new} new item(s) in the last "
+            f"{config.ingestion_stall_hours}h "
+            f"(threshold: {config.ingestion_stall_min_items}). "
+            "Check source adapters and feeds.",
+        )
+
+
 def run_ingestion(config: Config) -> None:
     """Load sources config and ingest items from all enabled RSS adapters."""
     started_at = datetime.now(timezone.utc).isoformat()
@@ -90,7 +156,19 @@ def run_ingestion(config: Config) -> None:
 
             adapter = adapter_cls(config.database_path, config.max_items_per_source)
             adapter.configure(adapter_config)
-            raw_items = adapter.fetch()
+            try:
+                raw_items = adapter.fetch()
+                _record_source_success(config.database_path, adapter.name)
+            except Exception as e:
+                logger.exception("Adapter '%s' fetch failed", adapter.name)
+                consecutive = _record_source_failure(config.database_path, adapter.name, str(e))
+                if consecutive >= config.source_failure_alert_threshold:
+                    _send_alert(
+                        config,
+                        f"[ALERT] Source adapter '{adapter.name}' has failed "
+                        f"{consecutive} consecutive run(s). Check logs for details.",
+                    )
+                continue
 
             for raw in raw_items:
                 result = ingest_item(
@@ -115,6 +193,8 @@ def run_ingestion(config: Config) -> None:
         {"items_new": total_new, "items_duplicate": total_dup},
         error=error_msg,
     )
+    if error_msg is None:
+        _check_ingestion_stall(config)
 
 
 _MAX_CLASSIFICATION_ATTEMPTS = 3

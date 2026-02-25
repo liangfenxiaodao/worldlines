@@ -38,6 +38,9 @@ class Config:
     sources_config_path: str = "./config/sources.json"
     similarity_dedup_threshold: float = 0.55
     similarity_dedup_window_hours: int = 48
+    ingestion_stall_hours: int = 24
+    ingestion_stall_min_items: int = 1
+    source_failure_alert_threshold: int = 3
 
     # Optional — Digest
     digest_schedule_cron: str = "0 18 * * *"
@@ -111,6 +114,11 @@ def load_config(env_path: str | Path | None = None) -> Config:
         ),
         similarity_dedup_window_hours=int(
             os.environ.get("SIMILARITY_DEDUP_WINDOW_HOURS", "48")
+        ),
+        ingestion_stall_hours=int(os.environ.get("INGESTION_STALL_HOURS", "24")),
+        ingestion_stall_min_items=int(os.environ.get("INGESTION_STALL_MIN_ITEMS", "1")),
+        source_failure_alert_threshold=int(
+            os.environ.get("SOURCE_FAILURE_ALERT_THRESHOLD", "3")
         ),
         # Optional — Digest
         digest_schedule_cron=os.environ.get("DIGEST_SCHEDULE_CRON", "0 18 * * *"),

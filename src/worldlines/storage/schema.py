@@ -163,6 +163,15 @@ CREATE TABLE IF NOT EXISTS exposure_errors (
     last_attempted_at   TEXT NOT NULL
 );
 
+-- Track per-adapter consecutive failures for alerting
+CREATE TABLE IF NOT EXISTS source_errors (
+    adapter_name         TEXT PRIMARY KEY,
+    consecutive_failures INTEGER NOT NULL DEFAULT 0,
+    last_error           TEXT,
+    last_failed_at       TEXT,
+    last_succeeded_at    TEXT
+);
+
 -- Periodic (weekly/monthly) structural summaries
 CREATE TABLE IF NOT EXISTS periodic_summaries (
     id                      TEXT PRIMARY KEY,

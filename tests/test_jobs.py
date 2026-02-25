@@ -9,6 +9,9 @@ from unittest.mock import MagicMock, patch
 from worldlines.config import Config
 from worldlines.ingestion.normalize import NormalizedItem, NormalizationResult
 from worldlines.jobs import (
+    _check_ingestion_stall,
+    _record_source_failure,
+    _record_source_success,
     _send_alert,
     run_analysis,
     run_digest,
@@ -106,6 +109,7 @@ class TestRunIngestion:
         raw1 = MagicMock()
         raw2 = MagicMock()
         adapter_instance = MagicMock()
+        adapter_instance.name = "rss"
         adapter_instance.fetch.return_value = [raw1, raw2]
         MockAdapter = MagicMock(return_value=adapter_instance)
         mock_get_cls.return_value = MockAdapter
@@ -139,6 +143,7 @@ class TestRunIngestion:
         init_db(config.database_path)
 
         adapter_instance = MagicMock()
+        adapter_instance.name = "rss"
         adapter_instance.fetch.return_value = [MagicMock(), MagicMock(), MagicMock()]
         MockAdapter = MagicMock(return_value=adapter_instance)
         mock_get_cls.return_value = MockAdapter
@@ -679,3 +684,271 @@ class TestAlertOnFailure:
             run_exposure_mapping(config)
         mock_alert.assert_called_once()
         assert "exposure" in mock_alert.call_args[0][1].lower()
+
+
+# --- TestSourceErrorTracking ---
+
+
+class TestSourceErrorTracking:
+    def test_record_source_failure_inserts_row(self, tmp_path):
+        config = _make_config(tmp_path)
+        init_db(config.database_path)
+
+        result = _record_source_failure(config.database_path, "rss", "connection refused")
+
+        assert result == 1
+        with get_connection(config.database_path) as conn:
+            row = conn.execute(
+                "SELECT consecutive_failures, last_error FROM source_errors WHERE adapter_name = ?",
+                ("rss",),
+            ).fetchone()
+        assert row is not None
+        assert row["consecutive_failures"] == 1
+        assert row["last_error"] == "connection refused"
+
+    def test_record_source_failure_increments_count(self, tmp_path):
+        config = _make_config(tmp_path)
+        init_db(config.database_path)
+
+        _record_source_failure(config.database_path, "rss", "error 1")
+        result = _record_source_failure(config.database_path, "rss", "error 2")
+
+        assert result == 2
+        with get_connection(config.database_path) as conn:
+            row = conn.execute(
+                "SELECT consecutive_failures FROM source_errors WHERE adapter_name = ?",
+                ("rss",),
+            ).fetchone()
+        assert row["consecutive_failures"] == 2
+
+    def test_record_source_success_resets_count(self, tmp_path):
+        config = _make_config(tmp_path)
+        init_db(config.database_path)
+
+        _record_source_failure(config.database_path, "rss", "error 1")
+        _record_source_failure(config.database_path, "rss", "error 2")
+        _record_source_success(config.database_path, "rss")
+
+        with get_connection(config.database_path) as conn:
+            row = conn.execute(
+                "SELECT consecutive_failures FROM source_errors WHERE adapter_name = ?",
+                ("rss",),
+            ).fetchone()
+        assert row["consecutive_failures"] == 0
+
+    def test_record_source_success_inserts_if_absent(self, tmp_path):
+        config = _make_config(tmp_path)
+        init_db(config.database_path)
+
+        _record_source_success(config.database_path, "hn")
+
+        with get_connection(config.database_path) as conn:
+            row = conn.execute(
+                "SELECT consecutive_failures FROM source_errors WHERE adapter_name = ?",
+                ("hn",),
+            ).fetchone()
+        assert row is not None
+        assert row["consecutive_failures"] == 0
+
+
+# --- TestIngestionStallDetection ---
+
+
+def _seed_pipeline_run(conn, items_new: int, started_at: str) -> None:
+    """Insert a fake ingestion pipeline_run record."""
+    conn.execute(
+        "INSERT INTO pipeline_runs (id, run_type, started_at, finished_at, status, result) "
+        "VALUES (?, 'ingestion', ?, ?, 'success', ?)",
+        (
+            str(__import__("uuid").uuid4()),
+            started_at,
+            started_at,
+            json.dumps({"items_new": items_new, "items_duplicate": 0}),
+        ),
+    )
+
+
+class TestIngestionStallDetection:
+    def test_stall_no_alert_insufficient_history(self, tmp_path):
+        """Fewer than 3 runs in the window → no alert."""
+        config = _make_config(tmp_path, ingestion_stall_hours=24, ingestion_stall_min_items=1)
+        init_db(config.database_path)
+
+        # Only 2 runs
+        with get_connection(config.database_path) as conn:
+            _seed_pipeline_run(conn, 0, "2026-02-25T10:00:00+00:00")
+            _seed_pipeline_run(conn, 0, "2026-02-25T11:00:00+00:00")
+
+        with patch("worldlines.jobs._send_alert") as mock_alert:
+            _check_ingestion_stall(config)
+        mock_alert.assert_not_called()
+
+    def test_stall_no_alert_items_above_threshold(self, tmp_path):
+        """3 runs with sufficient items → no alert."""
+        config = _make_config(tmp_path, ingestion_stall_hours=24, ingestion_stall_min_items=1)
+        init_db(config.database_path)
+
+        with get_connection(config.database_path) as conn:
+            _seed_pipeline_run(conn, 2, "2026-02-25T08:00:00+00:00")
+            _seed_pipeline_run(conn, 0, "2026-02-25T09:00:00+00:00")
+            _seed_pipeline_run(conn, 0, "2026-02-25T10:00:00+00:00")
+
+        with patch("worldlines.jobs._send_alert") as mock_alert:
+            _check_ingestion_stall(config)
+        mock_alert.assert_not_called()
+
+    def test_stall_alert_sent(self, tmp_path):
+        """3 runs, 0 items_new total, threshold=1 → alert sent."""
+        config = _make_config(tmp_path, ingestion_stall_hours=24, ingestion_stall_min_items=1)
+        init_db(config.database_path)
+
+        with get_connection(config.database_path) as conn:
+            _seed_pipeline_run(conn, 0, "2026-02-25T08:00:00+00:00")
+            _seed_pipeline_run(conn, 0, "2026-02-25T09:00:00+00:00")
+            _seed_pipeline_run(conn, 0, "2026-02-25T10:00:00+00:00")
+
+        with patch("worldlines.jobs._send_alert") as mock_alert:
+            _check_ingestion_stall(config)
+        mock_alert.assert_called_once()
+        assert "stall" in mock_alert.call_args[0][1].lower()
+
+
+# --- TestAdapterFailureAlert ---
+
+
+class TestAdapterFailureAlert:
+    @patch("worldlines.jobs.ingest_item")
+    @patch("worldlines.jobs.get_adapter_class")
+    def test_adapter_failure_records_source_error(self, mock_get_cls, mock_ingest, tmp_path):
+        config = _make_config(tmp_path)
+        init_db(config.database_path)
+
+        adapter_instance = MagicMock()
+        adapter_instance.name = "rss"
+        adapter_instance.fetch.side_effect = Exception("feed timeout")
+        MockAdapter = MagicMock(return_value=adapter_instance)
+        mock_get_cls.return_value = MockAdapter
+
+        with patch("worldlines.jobs._send_alert"):
+            run_ingestion(config)
+
+        with get_connection(config.database_path) as conn:
+            row = conn.execute(
+                "SELECT consecutive_failures FROM source_errors WHERE adapter_name = ?",
+                ("rss",),
+            ).fetchone()
+        assert row is not None
+        assert row["consecutive_failures"] == 1
+
+    @patch("worldlines.jobs.ingest_item")
+    @patch("worldlines.jobs.get_adapter_class")
+    def test_adapter_failure_no_alert_below_threshold(self, mock_get_cls, mock_ingest, tmp_path):
+        """2nd consecutive failure is below default threshold of 3 → no alert."""
+        config = _make_config(tmp_path, source_failure_alert_threshold=3)
+        init_db(config.database_path)
+
+        # Pre-seed 1 existing failure
+        _record_source_failure(config.database_path, "rss", "previous error")
+
+        adapter_instance = MagicMock()
+        adapter_instance.name = "rss"
+        adapter_instance.fetch.side_effect = Exception("another error")
+        MockAdapter = MagicMock(return_value=adapter_instance)
+        mock_get_cls.return_value = MockAdapter
+
+        with patch("worldlines.jobs._send_alert") as mock_alert:
+            run_ingestion(config)
+
+        # Alert should not have been called for adapter failure (only 2 consecutive)
+        adapter_alert_calls = [
+            c for c in mock_alert.call_args_list
+            if "consecutive" in c[0][1]
+        ]
+        assert len(adapter_alert_calls) == 0
+
+    @patch("worldlines.jobs.ingest_item")
+    @patch("worldlines.jobs.get_adapter_class")
+    def test_adapter_failure_alert_at_threshold(self, mock_get_cls, mock_ingest, tmp_path):
+        """3rd consecutive failure at threshold=3 → alert sent."""
+        config = _make_config(tmp_path, source_failure_alert_threshold=3)
+        init_db(config.database_path)
+
+        # Pre-seed 2 existing failures
+        _record_source_failure(config.database_path, "rss", "error 1")
+        _record_source_failure(config.database_path, "rss", "error 2")
+
+        adapter_instance = MagicMock()
+        adapter_instance.name = "rss"
+        adapter_instance.fetch.side_effect = Exception("error 3")
+        MockAdapter = MagicMock(return_value=adapter_instance)
+        mock_get_cls.return_value = MockAdapter
+
+        with patch("worldlines.jobs._send_alert") as mock_alert:
+            run_ingestion(config)
+
+        adapter_alert_calls = [
+            c for c in mock_alert.call_args_list
+            if "consecutive" in c[0][1]
+        ]
+        assert len(adapter_alert_calls) == 1
+        assert "rss" in adapter_alert_calls[0][0][1]
+
+    @patch("worldlines.jobs.ingest_item")
+    @patch("worldlines.jobs.get_adapter_class")
+    def test_adapter_failure_continues_to_next_adapter(self, mock_get_cls, mock_ingest, tmp_path):
+        """A failed adapter should not abort processing of remaining adapters."""
+        sources = {
+            "adapters": [
+                {"type": "rss", "enabled": True, "feeds": []},
+                {"type": "hn", "enabled": True},
+            ]
+        }
+        config = _make_config(tmp_path, _sources=sources)
+        init_db(config.database_path)
+
+        failing_adapter = MagicMock()
+        failing_adapter.name = "rss"
+        failing_adapter.fetch.side_effect = Exception("rss down")
+
+        passing_adapter = MagicMock()
+        passing_adapter.name = "hn"
+        passing_adapter.fetch.return_value = []
+
+        mock_get_cls.side_effect = lambda t: (
+            MagicMock(return_value=failing_adapter) if t == "rss"
+            else MagicMock(return_value=passing_adapter)
+        )
+
+        with patch("worldlines.jobs._send_alert"):
+            run_ingestion(config)
+
+        passing_adapter.fetch.assert_called_once()
+
+    @patch("worldlines.jobs.ingest_item")
+    @patch("worldlines.jobs.get_adapter_class")
+    def test_adapter_success_resets_failures(self, mock_get_cls, mock_ingest, tmp_path):
+        """A successful fetch after failures resets consecutive_failures to 0."""
+        config = _make_config(tmp_path)
+        init_db(config.database_path)
+
+        # Pre-seed 2 failures
+        _record_source_failure(config.database_path, "rss", "old error")
+        _record_source_failure(config.database_path, "rss", "old error 2")
+
+        adapter_instance = MagicMock()
+        adapter_instance.name = "rss"
+        adapter_instance.fetch.return_value = []
+        MockAdapter = MagicMock(return_value=adapter_instance)
+        mock_get_cls.return_value = MockAdapter
+
+        mock_ingest.return_value = MagicMock(status="new")
+
+        with patch("worldlines.jobs._send_alert"):
+            run_ingestion(config)
+
+        with get_connection(config.database_path) as conn:
+            row = conn.execute(
+                "SELECT consecutive_failures FROM source_errors WHERE adapter_name = ?",
+                ("rss",),
+            ).fetchone()
+        assert row["consecutive_failures"] == 0
