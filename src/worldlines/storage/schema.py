@@ -341,6 +341,14 @@ _TICKER_ALIASES: dict[str, str] = {
 }
 
 
+def _migrate_temporal_links_add_rationale_version(conn: sqlite3.Connection) -> None:
+    """Add rationale_version column to temporal_links (NULL = mechanical rationale)."""
+    try:
+        conn.execute("ALTER TABLE temporal_links ADD COLUMN rationale_version TEXT")
+    except sqlite3.OperationalError:
+        pass  # Column already exists
+
+
 def _migrate_pipeline_runs_add_periodic_summary(conn: sqlite3.Connection) -> None:
     """Recreate pipeline_runs table to add 'periodic_summary' to run_type CHECK constraint."""
     try:
@@ -459,4 +467,5 @@ def init_db(database_path: str) -> None:
         _migrate_pipeline_runs_add_cluster_synthesis(conn)
         _migrate_pipeline_runs_add_periodic_summary(conn)
         _migrate_normalize_ticker_aliases(conn)
+        _migrate_temporal_links_add_rationale_version(conn)
     logger.info("Database initialized at %s", database_path)
