@@ -6,9 +6,9 @@ import json
 import logging
 import uuid
 from dataclasses import dataclass
-from datetime import datetime, timezone
+from datetime import datetime, timedelta, timezone
 
-from worldlines.ingestion.dedup import compute_dedup_hash
+from worldlines.ingestion.dedup import compute_dedup_hash, compute_title_shingle_similarity
 from worldlines.storage.connection import get_connection
 
 logger = logging.getLogger(__name__)
@@ -130,7 +130,12 @@ def persist_item(item: NormalizedItem, database_path: str) -> None:
     logger.info("Persisted item %s (%s)", item.id, item.title)
 
 
-def ingest_item(raw: RawSourceItem, database_path: str) -> NormalizationResult:
+def ingest_item(
+    raw: RawSourceItem,
+    database_path: str,
+    similarity_threshold: float = 0.0,
+    similarity_window_hours: int = 48,
+) -> NormalizationResult:
     """Normalize a raw item and deduplicate against the Items Store.
 
     1. Normalize the raw item (validate, generate UUID, compute dedup hash).
@@ -165,6 +170,39 @@ def ingest_item(raw: RawSourceItem, database_path: str) -> NormalizationResult:
             return NormalizationResult(
                 status="duplicate", item=item, duplicate_of=canonical_id
             )
+
+        # Similarity dedup (only when threshold > 0)
+        if similarity_threshold > 0.0:
+            window_cutoff = (
+                datetime.now(timezone.utc) - timedelta(hours=similarity_window_hours)
+            ).isoformat()
+            recent_rows = conn.execute(
+                "SELECT id, title FROM items WHERE ingested_at >= ? "
+                "ORDER BY ingested_at DESC LIMIT 200",
+                (window_cutoff,),
+            ).fetchall()
+            for recent in recent_rows:
+                score = compute_title_shingle_similarity(item.title, recent["title"])
+                if score >= similarity_threshold:
+                    canonical_id = recent["id"]
+                    conn.execute(
+                        "INSERT INTO deduplication_records "
+                        "(canonical_item_id, duplicate_item_ids, deduped_at, method) "
+                        "VALUES (?, ?, ?, ?)",
+                        (
+                            canonical_id,
+                            json.dumps([item.id]),
+                            datetime.now(timezone.utc).isoformat(),
+                            "content_similarity",
+                        ),
+                    )
+                    logger.info(
+                        "Near-duplicate: '%s' ~ '%s' (score=%.2f)",
+                        item.title, recent["title"], score,
+                    )
+                    return NormalizationResult(
+                        status="duplicate", item=item, duplicate_of=canonical_id
+                    )
 
         conn.execute(
             "INSERT INTO items "

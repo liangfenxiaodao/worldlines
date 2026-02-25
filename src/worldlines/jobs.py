@@ -93,7 +93,12 @@ def run_ingestion(config: Config) -> None:
             raw_items = adapter.fetch()
 
             for raw in raw_items:
-                result = ingest_item(raw, config.database_path)
+                result = ingest_item(
+                    raw,
+                    config.database_path,
+                    similarity_threshold=config.similarity_dedup_threshold,
+                    similarity_window_hours=config.similarity_dedup_window_hours,
+                )
                 if result.status == "new":
                     total_new += 1
                 else:

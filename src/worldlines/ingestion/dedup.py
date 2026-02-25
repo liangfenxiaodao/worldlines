@@ -21,6 +21,27 @@ def _normalize_text(text: str) -> str:
     return text.strip()
 
 
+def compute_title_shingle_similarity(title1: str, title2: str, n: int = 4) -> float:
+    """Compute character n-gram (shingling) Jaccard similarity between two titles.
+
+    Returns a float in [0, 1]. Uses the same _normalize_text() normalization
+    as the hash function.
+    """
+    def _shingles(text: str) -> frozenset[str]:
+        normalized = _normalize_text(text)
+        if len(normalized) < n:
+            return frozenset({normalized}) if normalized else frozenset()
+        return frozenset(normalized[i : i + n] for i in range(len(normalized) - n + 1))
+
+    s1 = _shingles(title1)
+    s2 = _shingles(title2)
+    if not s1 or not s2:
+        return 0.0
+    intersection = len(s1 & s2)
+    union = len(s1 | s2)
+    return intersection / union
+
+
 def compute_dedup_hash(title: str, source_name: str, content: str) -> str:
     """Compute a SHA-256 deduplication hash from title, source name, and content.
 

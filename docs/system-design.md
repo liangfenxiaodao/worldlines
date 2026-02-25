@@ -408,20 +408,36 @@ Secrets are managed via `fly secrets set`. The SQLite database path is configure
 ## 12. Evolution Path
 
 ### 12.1 MVP: Ingest → Analyze → Telegram Digest
-Current phase.
-
-A single source adapter ingests information, the AI layer classifies it, and a daily Telegram digest is delivered. Deployed to cloud and running unattended.
+Shipped. A single source adapter ingests information, the AI layer classifies it, and a daily Telegram digest is delivered. Deployed and running unattended.
 
 ### 12.2 Phase 2: Exposure Mapping & Additional Sources
-Structural exposure mapping is added. Additional source adapters broaden coverage.
+Shipped. Structural exposure mapping to publicly listed companies. Additional source adapters (HN, Reddit, GitHub Trending). Ticker-centric exposure views.
 
 ### 12.3 Phase 3: Signal Aggregation & Query Interface
-Patterns and densities become visible. A review surface (CLI or web) enables browsing and filtering.
+Shipped. Web frontend for browsing items, exposures, digests, ticker clusters, and structural syntheses. Temporal linking connects signals across 90-day windows. Weekly periodic summaries.
 
-### 12.4 Phase 4: Temporal Linking & Hypothesis Tracking
-Optional future phase.
+### 12.4 Phase 4: Signal Quality & Depth
+Next phase. Focus areas:
 
-Temporal links connect signals across time. Explicit hypotheses may be tracked, but never forced.
+**Signal quality**
+- Structured source adapters: SEC filings (10-K/10-Q), earnings transcripts, central bank publications, patent filings, ArXiv
+- Content-similarity deduplication to collapse near-duplicate coverage across feeds
+- Data quality alerting when ingestion stalls
+
+**Analytical depth**
+- LLM-generated rationale for temporal links (replace mechanical change-type inference)
+- Cross-period synthesis: quarterly roll-up comparing periodic summaries over time
+- Contextual classification: provide 3–5 related prior analyses as context when classifying new items
+
+**Exposure quality**
+- Ticker validation against a known universe to catch LLM errors
+- Visibility into exposure mapping skip rate to tune prompt conservatism
+
+### 12.5 Phase 5: Discovery & Navigation
+- Full-text search across items, summaries, and analyses
+- Richer dashboard: dimension trend lines, recent high-importance items, top active tickers
+- Cross-ticker co-occurrence: surface tickers that frequently appear together and imply structural relationships
+- Cluster synthesis staleness handling: expire and regenerate when the 90-day window shifts significantly
 
 ---
 

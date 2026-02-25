@@ -36,6 +36,8 @@ class Config:
     fetch_interval_minutes: int = 60
     max_items_per_source: int = 50
     sources_config_path: str = "./config/sources.json"
+    similarity_dedup_threshold: float = 0.55
+    similarity_dedup_window_hours: int = 48
 
     # Optional — Digest
     digest_schedule_cron: str = "0 18 * * *"
@@ -104,6 +106,12 @@ def load_config(env_path: str | Path | None = None) -> Config:
         fetch_interval_minutes=int(os.environ.get("FETCH_INTERVAL_MINUTES", "60")),
         max_items_per_source=int(os.environ.get("MAX_ITEMS_PER_SOURCE", "50")),
         sources_config_path=os.environ.get("SOURCES_CONFIG_PATH", "./config/sources.json"),
+        similarity_dedup_threshold=float(
+            os.environ.get("SIMILARITY_DEDUP_THRESHOLD", "0.55")
+        ),
+        similarity_dedup_window_hours=int(
+            os.environ.get("SIMILARITY_DEDUP_WINDOW_HOURS", "48")
+        ),
         # Optional — Digest
         digest_schedule_cron=os.environ.get("DIGEST_SCHEDULE_CRON", "0 18 * * *"),
         digest_timezone=os.environ.get("DIGEST_TIMEZONE", "UTC"),

@@ -304,3 +304,96 @@ class TestIngestItem:
     def test_invalid_item_raises(self, db_path):
         with pytest.raises(ValueError, match="Invalid RawSourceItem"):
             ingest_item(_make_raw(title=""), db_path)
+
+
+# --- Ingest with similarity dedup ---
+
+
+class TestIngestItemSimilarityDedup:
+    def test_disabled_by_default(self, db_path):
+        # threshold=0.0 (default): near-identical titles both ingested
+        raw1 = _make_raw(title="Nvidia posts record quarterly AI chip revenue")
+        raw2 = _make_raw(
+            title="Nvidia reports record quarterly AI chip revenue",
+            source_name="Other Source",  # different source → different dedup_hash
+        )
+        r1 = ingest_item(raw1, db_path)
+        r2 = ingest_item(raw2, db_path)
+        assert r1.status == "new"
+        assert r2.status == "new"
+
+    def test_near_duplicate_flagged(self, db_path):
+        raw1 = _make_raw(title="Nvidia posts record quarterly AI chip revenue")
+        raw2 = _make_raw(
+            title="Nvidia reports record quarterly AI chip revenue",
+            source_name="Other Source",
+        )
+        ingest_item(raw1, db_path)
+        result = ingest_item(raw2, db_path, similarity_threshold=0.5)
+        assert result.status == "duplicate"
+
+    def test_near_duplicate_not_inserted(self, db_path):
+        raw1 = _make_raw(title="Nvidia posts record quarterly AI chip revenue")
+        raw2 = _make_raw(
+            title="Nvidia reports record quarterly AI chip revenue",
+            source_name="Other Source",
+        )
+        ingest_item(raw1, db_path)
+        result = ingest_item(raw2, db_path, similarity_threshold=0.5)
+
+        with get_connection(db_path) as conn:
+            row = conn.execute(
+                "SELECT id FROM items WHERE id = ?", (result.item.id,)
+            ).fetchone()
+        assert row is None
+
+    def test_near_duplicate_dedup_record(self, db_path):
+        raw1 = _make_raw(title="Nvidia posts record quarterly AI chip revenue")
+        raw2 = _make_raw(
+            title="Nvidia reports record quarterly AI chip revenue",
+            source_name="Other Source",
+        )
+        first = ingest_item(raw1, db_path)
+        ingest_item(raw2, db_path, similarity_threshold=0.5)
+
+        with get_connection(db_path) as conn:
+            row = conn.execute(
+                "SELECT method FROM deduplication_records WHERE canonical_item_id = ?",
+                (first.item.id,),
+            ).fetchone()
+        assert row is not None
+        assert row["method"] == "content_similarity"
+
+    def test_near_duplicate_points_to_canonical(self, db_path):
+        raw1 = _make_raw(title="Nvidia posts record quarterly AI chip revenue")
+        raw2 = _make_raw(
+            title="Nvidia reports record quarterly AI chip revenue",
+            source_name="Other Source",
+        )
+        first = ingest_item(raw1, db_path)
+        second = ingest_item(raw2, db_path, similarity_threshold=0.5)
+        assert second.duplicate_of == first.item.id
+
+    def test_distinct_items_both_ingested(self, db_path):
+        raw1 = _make_raw(title="Federal Reserve holds interest rates steady")
+        raw2 = _make_raw(
+            title="Wheat harvest shortfall reported in Ukraine",
+            source_name="Other Source",
+        )
+        r1 = ingest_item(raw1, db_path, similarity_threshold=0.55)
+        r2 = ingest_item(raw2, db_path, similarity_threshold=0.55)
+        assert r1.status == "new"
+        assert r2.status == "new"
+
+    def test_hash_exact_takes_precedence(self, db_path):
+        # Identical items are caught by hash_exact before similarity check runs
+        raw = _make_raw(title="Nvidia posts record quarterly AI chip revenue")
+        ingest_item(raw, db_path)
+        result = ingest_item(raw, db_path, similarity_threshold=0.5)
+        assert result.status == "duplicate"
+
+        with get_connection(db_path) as conn:
+            row = conn.execute(
+                "SELECT method FROM deduplication_records"
+            ).fetchone()
+        assert row["method"] == "hash_exact"

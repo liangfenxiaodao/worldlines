@@ -2,7 +2,7 @@
 
 from __future__ import annotations
 
-from worldlines.ingestion.dedup import compute_dedup_hash, _normalize_text
+from worldlines.ingestion.dedup import compute_dedup_hash, compute_title_shingle_similarity, _normalize_text
 
 
 # --- Normalization ---
@@ -101,3 +101,48 @@ class TestComputeDedupHash:
         h = compute_dedup_hash("", "", "")
         assert isinstance(h, str)
         assert len(h) == 64
+
+
+# --- Title shingle similarity ---
+
+
+class TestComputeTitleShingleSimilarity:
+    def test_identical_titles(self):
+        score = compute_title_shingle_similarity("Nvidia posts record revenue", "Nvidia posts record revenue")
+        assert score == 1.0
+
+    def test_completely_different_titles(self):
+        score = compute_title_shingle_similarity(
+            "Nvidia posts record revenue", "Wheat harvest shortfall in Ukraine"
+        )
+        assert score < 0.2
+
+    def test_case_insensitive(self):
+        score_lower = compute_title_shingle_similarity("nvidia posts revenue", "nvidia posts revenue")
+        score_mixed = compute_title_shingle_similarity("Nvidia Posts Revenue", "NVIDIA POSTS REVENUE")
+        assert score_lower == 1.0
+        assert score_mixed == 1.0
+
+    def test_short_title_below_n(self):
+        # Single word — shorter than the 4-gram window; should not crash
+        score = compute_title_shingle_similarity("AI", "AI")
+        assert score == 1.0
+
+    def test_empty_title_returns_zero(self):
+        assert compute_title_shingle_similarity("", "Nvidia posts revenue") == 0.0
+        assert compute_title_shingle_similarity("Nvidia posts revenue", "") == 0.0
+        assert compute_title_shingle_similarity("", "") == 0.0
+
+    def test_same_story_scores_high(self):
+        # One word swapped ("posts" → "reports"), otherwise identical
+        t1 = "Nvidia posts record quarterly AI chip revenue"
+        t2 = "Nvidia reports record quarterly AI chip revenue"
+        score = compute_title_shingle_similarity(t1, t2)
+        assert score >= 0.55
+
+    def test_different_story_scores_low(self):
+        # Same entity, different event — should NOT exceed threshold
+        t1 = "Federal Reserve holds interest rates steady"
+        t2 = "Federal Reserve raises interest rates sharply"
+        score = compute_title_shingle_similarity(t1, t2)
+        assert score < 0.55

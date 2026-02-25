@@ -121,8 +121,16 @@ class TestRunIngestion:
         adapter_instance.configure.assert_called_once()
         adapter_instance.fetch.assert_called_once()
         assert mock_ingest.call_count == 2
-        mock_ingest.assert_any_call(raw1, config.database_path)
-        mock_ingest.assert_any_call(raw2, config.database_path)
+        mock_ingest.assert_any_call(
+            raw1, config.database_path,
+            similarity_threshold=config.similarity_dedup_threshold,
+            similarity_window_hours=config.similarity_dedup_window_hours,
+        )
+        mock_ingest.assert_any_call(
+            raw2, config.database_path,
+            similarity_threshold=config.similarity_dedup_threshold,
+            similarity_window_hours=config.similarity_dedup_window_hours,
+        )
 
     @patch("worldlines.jobs.ingest_item")
     @patch("worldlines.jobs.get_adapter_class")
