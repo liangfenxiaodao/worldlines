@@ -3,7 +3,7 @@
 from __future__ import annotations
 
 import json
-from datetime import datetime, timezone
+from datetime import datetime, timedelta, timezone
 from unittest.mock import MagicMock, patch
 
 from worldlines.config import Config
@@ -774,10 +774,11 @@ class TestIngestionStallDetection:
         config = _make_config(tmp_path, ingestion_stall_hours=24, ingestion_stall_min_items=1)
         init_db(config.database_path)
 
+        now = datetime.now(timezone.utc)
         # Only 2 runs
         with get_connection(config.database_path) as conn:
-            _seed_pipeline_run(conn, 0, "2026-02-25T10:00:00+00:00")
-            _seed_pipeline_run(conn, 0, "2026-02-25T11:00:00+00:00")
+            _seed_pipeline_run(conn, 0, (now - timedelta(hours=2)).isoformat())
+            _seed_pipeline_run(conn, 0, (now - timedelta(hours=1)).isoformat())
 
         with patch("worldlines.jobs._send_alert") as mock_alert:
             _check_ingestion_stall(config)
@@ -788,10 +789,11 @@ class TestIngestionStallDetection:
         config = _make_config(tmp_path, ingestion_stall_hours=24, ingestion_stall_min_items=1)
         init_db(config.database_path)
 
+        now = datetime.now(timezone.utc)
         with get_connection(config.database_path) as conn:
-            _seed_pipeline_run(conn, 2, "2026-02-25T08:00:00+00:00")
-            _seed_pipeline_run(conn, 0, "2026-02-25T09:00:00+00:00")
-            _seed_pipeline_run(conn, 0, "2026-02-25T10:00:00+00:00")
+            _seed_pipeline_run(conn, 2, (now - timedelta(hours=3)).isoformat())
+            _seed_pipeline_run(conn, 0, (now - timedelta(hours=2)).isoformat())
+            _seed_pipeline_run(conn, 0, (now - timedelta(hours=1)).isoformat())
 
         with patch("worldlines.jobs._send_alert") as mock_alert:
             _check_ingestion_stall(config)
@@ -802,10 +804,11 @@ class TestIngestionStallDetection:
         config = _make_config(tmp_path, ingestion_stall_hours=24, ingestion_stall_min_items=1)
         init_db(config.database_path)
 
+        now = datetime.now(timezone.utc)
         with get_connection(config.database_path) as conn:
-            _seed_pipeline_run(conn, 0, "2026-02-25T08:00:00+00:00")
-            _seed_pipeline_run(conn, 0, "2026-02-25T09:00:00+00:00")
-            _seed_pipeline_run(conn, 0, "2026-02-25T10:00:00+00:00")
+            _seed_pipeline_run(conn, 0, (now - timedelta(hours=3)).isoformat())
+            _seed_pipeline_run(conn, 0, (now - timedelta(hours=2)).isoformat())
+            _seed_pipeline_run(conn, 0, (now - timedelta(hours=1)).isoformat())
 
         with patch("worldlines.jobs._send_alert") as mock_alert:
             _check_ingestion_stall(config)
