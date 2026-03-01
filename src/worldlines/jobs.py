@@ -15,7 +15,6 @@ from worldlines.analysis.classifier import classify_item
 from worldlines.exposure.mapper import map_exposures
 from worldlines.config import Config
 from worldlines.digest.periodic import generate_periodic_summary
-from worldlines.synthesis.synthesizer import synthesize_cluster
 from worldlines.digest.digest import generate_digest
 from worldlines.digest.telegram import send_message
 import worldlines.ingestion  # noqa: F401  — triggers adapter registration
@@ -638,158 +637,6 @@ def run_temporal_linking(config: Config) -> None:
     )
 
 
-def run_cluster_synthesis(config: Config) -> None:
-    """Synthesize structural insights for each ticker cluster in the 90-day window."""
-    started_at = datetime.now(timezone.utc).isoformat()
-    error_msg = None
-    tickers_found = 0
-    synthesized = 0
-    skipped = 0
-    errors = 0
-
-    try:
-        cutoff = (datetime.now(timezone.utc) - timedelta(days=_TEMPORAL_LINK_WINDOW_DAYS)).isoformat()
-
-        with get_connection(config.database_path) as conn:
-            rows = conn.execute(
-                "SELECT i.id AS item_id, "
-                "json_extract(t.value, '$.ticker') AS ticker "
-                "FROM items i "
-                "JOIN analyses a ON a.item_id = i.id "
-                "JOIN exposures e ON e.analysis_id = a.id "
-                "JOIN json_each(e.exposures) t "
-                "WHERE e.skipped_reason IS NULL "
-                "AND json_extract(t.value, '$.ticker') IS NOT NULL "
-                "AND i.timestamp >= ?",
-                (cutoff,),
-            ).fetchall()
-
-        # Group by ticker -> sorted list of item_ids
-        ticker_items: dict[str, list[str]] = {}
-        for r in rows:
-            ticker = r["ticker"]
-            item_id = r["item_id"]
-            if ticker not in ticker_items:
-                ticker_items[ticker] = []
-            if item_id not in ticker_items[ticker]:
-                ticker_items[ticker].append(item_id)
-
-        # Sort item_ids per ticker for stable comparison
-        for ticker in ticker_items:
-            ticker_items[ticker] = sorted(ticker_items[ticker])
-
-        tickers_found = sum(1 for ids in ticker_items.values() if len(ids) >= 2)
-
-        # Load existing syntheses for comparison
-        with get_connection(config.database_path) as conn:
-            existing_rows = conn.execute(
-                "SELECT ticker, item_ids FROM cluster_syntheses"
-            ).fetchall()
-        existing: dict[str, str] = {r["ticker"]: r["item_ids"] for r in existing_rows}
-
-        now = datetime.now(timezone.utc).isoformat()
-
-        for ticker, item_ids in ticker_items.items():
-            if len(item_ids) < 2:
-                continue
-
-            item_ids_json = json.dumps(item_ids)
-
-            # Skip if cluster composition unchanged
-            if existing.get(ticker) == item_ids_json:
-                skipped += 1
-                continue
-
-            # Fetch full data for each item in the cluster
-            placeholders = ",".join("?" * len(item_ids))
-            with get_connection(config.database_path) as conn:
-                item_rows = conn.execute(
-                    f"SELECT i.id, i.title, i.source_name, i.timestamp, "  # noqa: S608
-                    f"a.summary, a.change_type, a.time_horizon "
-                    f"FROM items i JOIN analyses a ON a.item_id = i.id "
-                    f"WHERE i.id IN ({placeholders}) "
-                    f"ORDER BY i.timestamp DESC",
-                    item_ids,
-                ).fetchall()
-
-            items_data = [
-                {
-                    "id": r["id"],
-                    "title": r["title"],
-                    "source_name": r["source_name"],
-                    "timestamp": r["timestamp"],
-                    "summary": r["summary"],
-                    "change_type": r["change_type"],
-                    "time_horizon": r["time_horizon"],
-                }
-                for r in item_rows
-            ]
-
-            try:
-                result = synthesize_cluster(
-                    ticker,
-                    items_data,
-                    api_key=config.llm_api_key,
-                    model=config.llm_model,
-                    temperature=config.llm_temperature,
-                    max_retries=config.llm_max_retries,
-                    timeout=config.llm_timeout_seconds,
-                )
-            except Exception:
-                errors += 1
-                logger.exception("Unexpected error synthesizing cluster for ticker %s", ticker)
-                continue
-
-            if result.error:
-                errors += 1
-                logger.warning(
-                    "Synthesis error for ticker %s: %s", ticker, result.error
-                )
-                if result.error.get("code") == "api_error":
-                    logger.warning("API error detected; stopping cluster synthesis early")
-                    break
-                continue
-
-            # UPSERT into cluster_syntheses
-            with get_connection(config.database_path) as conn:
-                conn.execute(
-                    "INSERT INTO cluster_syntheses "
-                    "(id, ticker, item_ids, item_count, synthesis, synthesized_at, synthesis_version) "
-                    "VALUES (?, ?, ?, ?, ?, ?, ?) "
-                    "ON CONFLICT(ticker) DO UPDATE SET "
-                    "item_ids = excluded.item_ids, "
-                    "item_count = excluded.item_count, "
-                    "synthesis = excluded.synthesis, "
-                    "synthesized_at = excluded.synthesized_at, "
-                    "synthesis_version = excluded.synthesis_version",
-                    (
-                        str(uuid.uuid4()),
-                        ticker,
-                        item_ids_json,
-                        len(item_ids),
-                        result.synthesis,
-                        now,
-                        config.cluster_synthesis_version,
-                    ),
-                )
-            synthesized += 1
-            logger.info("Synthesized cluster for ticker %s (%d items)", ticker, len(item_ids))
-
-        logger.info(
-            "Cluster synthesis complete: %d tickers found, %d synthesized, %d skipped, %d errors",
-            tickers_found, synthesized, skipped, errors,
-        )
-    except Exception:
-        logger.exception("Cluster synthesis failed")
-        error_msg = "Cluster synthesis failed (see logs)"
-        _send_alert(config, "Cluster synthesis pipeline failed. Check logs for details.")
-
-    _record_run(
-        config.database_path, "cluster_synthesis", started_at,
-        {"tickers_found": tickers_found, "synthesized": synthesized, "skipped": skipped, "errors": errors},
-        error=error_msg,
-    )
-
 
 def run_periodic_summary(config: Config) -> None:
     """Generate and deliver a periodic structural summary over the configured window."""
@@ -853,9 +700,8 @@ def run_periodic_summary(config: Config) -> None:
 
 
 def run_pipeline(config: Config) -> None:
-    """Run ingestion, analysis, exposure mapping, temporal linking, then cluster synthesis."""
+    """Run ingestion, analysis, exposure mapping, and temporal linking."""
     run_ingestion(config)
     run_analysis(config)
     run_exposure_mapping(config)
     run_temporal_linking(config)
-    run_cluster_synthesis(config)
