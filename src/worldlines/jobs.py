@@ -13,7 +13,6 @@ from zoneinfo import ZoneInfo
 
 from worldlines.analysis.classifier import classify_item
 from worldlines.exposure.mapper import map_exposures
-from worldlines.linking.rationale import generate_link_rationale
 from worldlines.config import Config
 from worldlines.digest.periodic import generate_periodic_summary
 from worldlines.synthesis.synthesizer import synthesize_cluster
@@ -556,8 +555,6 @@ def run_temporal_linking(config: Config) -> None:
     error_msg = None
     links_created = 0
     pairs_considered = 0
-    rationale_generated = 0
-    rationale_errors = 0
 
     try:
         cutoff = (datetime.now(timezone.utc) - timedelta(days=_TEMPORAL_LINK_WINDOW_DAYS)).isoformat()
@@ -565,8 +562,7 @@ def run_temporal_linking(config: Config) -> None:
 
         with get_connection(config.database_path) as conn:
             rows = conn.execute(
-                "SELECT i.id AS item_id, i.title, i.timestamp AS item_timestamp, "
-                "a.change_type, a.summary, a.dimensions, "
+                "SELECT i.id AS item_id, i.timestamp AS item_timestamp, a.change_type, "
                 "json_extract(t.value, '$.ticker') AS ticker "
                 "FROM items i "
                 "JOIN analyses a ON a.item_id = i.id "
@@ -578,7 +574,7 @@ def run_temporal_linking(config: Config) -> None:
                 (cutoff,),
             ).fetchall()
 
-        # Group by ticker -> list of {item_id, title, timestamp, change_type, summary, dimensions}
+        # Group by ticker -> list of {item_id, timestamp, change_type}
         ticker_items: dict[str, list[dict]] = {}
         for r in rows:
             ticker = r["ticker"]
@@ -586,15 +582,12 @@ def run_temporal_linking(config: Config) -> None:
                 ticker_items[ticker] = []
             ticker_items[ticker].append({
                 "item_id": r["item_id"],
-                "title": r["title"],
                 "timestamp": r["item_timestamp"],
                 "change_type": r["change_type"],
-                "summary": r["summary"],
-                "dimensions": r["dimensions"],
             })
 
         # For each ticker with >=2 items, form ordered pairs (newer -> older)
-        # Accumulate per unique (source_id, target_id): shared tickers and item data
+        # Accumulate per unique (source_id, target_id): shared tickers and change_types
         pair_data: dict[tuple[str, str], dict] = {}
         for ticker, items in ticker_items.items():
             if len(items) < 2:
@@ -609,14 +602,6 @@ def run_temporal_linking(config: Config) -> None:
                             "tickers": [],
                             "newer_ct": newer["change_type"],
                             "older_ct": older["change_type"],
-                            "source_title": newer["title"],
-                            "source_summary": newer["summary"],
-                            "source_dimensions": newer["dimensions"],
-                            "source_timestamp": newer["timestamp"],
-                            "target_title": older["title"],
-                            "target_summary": older["summary"],
-                            "target_dimensions": older["dimensions"],
-                            "target_timestamp": older["timestamp"],
                         }
                     pair_data[key]["tickers"].append(ticker)
 
@@ -635,46 +620,11 @@ def run_temporal_linking(config: Config) -> None:
                     "VALUES (?, ?, ?, ?, ?, ?)",
                     (str(uuid.uuid4()), source_id, target_id, link_type, now, rationale),
                 )
-                if cursor.rowcount == 1:
-                    links_created += 1
-                    result = generate_link_rationale(
-                        source_item={
-                            "title": data["source_title"],
-                            "summary": data["source_summary"],
-                            "dimensions": data["source_dimensions"],
-                            "change_type": data["newer_ct"],
-                            "timestamp": data["source_timestamp"],
-                        },
-                        target_item={
-                            "title": data["target_title"],
-                            "summary": data["target_summary"],
-                            "dimensions": data["target_dimensions"],
-                            "change_type": data["older_ct"],
-                            "timestamp": data["target_timestamp"],
-                        },
-                        shared_tickers=shared_tickers,
-                        link_type=link_type,
-                        api_key=config.llm_api_key,
-                        model=config.llm_model,
-                        rationale_version=config.link_rationale_version,
-                        temperature=config.llm_temperature,
-                        max_retries=config.llm_max_retries,
-                        timeout=config.llm_timeout_seconds,
-                    )
-                    if result.rationale:
-                        conn.execute(
-                            "UPDATE temporal_links SET rationale = ?, rationale_version = ? "
-                            "WHERE source_item_id = ? AND target_item_id = ?",
-                            (result.rationale, config.link_rationale_version, source_id, target_id),
-                        )
-                        rationale_generated += 1
-                    else:
-                        rationale_errors += 1
+                links_created += cursor.rowcount
 
         logger.info(
-            "Temporal linking complete: %d links created, %d pairs considered, "
-            "%d rationales generated, %d rationale errors",
-            links_created, pairs_considered, rationale_generated, rationale_errors,
+            "Temporal linking complete: %d links created, %d pairs considered",
+            links_created, pairs_considered,
         )
     except Exception:
         logger.exception("Temporal linking failed")
@@ -683,12 +633,7 @@ def run_temporal_linking(config: Config) -> None:
 
     _record_run(
         config.database_path, "temporal_linking", started_at,
-        {
-            "links_created": links_created,
-            "pairs_considered": pairs_considered,
-            "rationale_generated": rationale_generated,
-            "rationale_errors": rationale_errors,
-        },
+        {"links_created": links_created, "pairs_considered": pairs_considered},
         error=error_msg,
     )
 
