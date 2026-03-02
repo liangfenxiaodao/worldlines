@@ -64,7 +64,16 @@ def _make_config(tmp_path, **overrides) -> Config:
     return Config(**defaults)
 
 
-def _seed_item(conn, item_id, title="Test Article"):
+_LONG_CONTENT = (
+    "This is a test article with sufficient content to pass the minimum word count filter. "
+    "It discusses structural changes in the technology sector, including new computational "
+    "paradigms, capital allocation trends, and energy constraints. Analysts note that these "
+    "developments have long-term implications for infrastructure investment and industrial "
+    "diffusion of new technologies across markets."
+)
+
+
+def _seed_item(conn, item_id, title="Test Article", content=_LONG_CONTENT):
     """Insert a test item into the items table."""
     conn.execute(
         "INSERT INTO items "
@@ -73,7 +82,7 @@ def _seed_item(conn, item_id, title="Test Article"):
         "VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)",
         (
             item_id, title, "Test Source", "news",
-            "2025-06-15T08:00:00+00:00", "Article content here.",
+            "2025-06-15T08:00:00+00:00", content,
             "https://example.com/1", "2025-06-15T08:01:00+00:00", f"hash-{item_id}",
         ),
     )
@@ -292,7 +301,8 @@ class TestRunAnalysis:
         with patch("worldlines.jobs.logger") as mock_logger:
             run_analysis(config)
             mock_logger.info.assert_any_call(
-                "Analysis complete: %d analyzed, %d errors", 1, 1
+                "Analysis complete: %d analyzed, %d errors (cap=%d)",
+                1, 1, config.analysis_max_per_run,
             )
 
     @patch("worldlines.jobs.classify_item")
@@ -355,6 +365,40 @@ class TestRunAnalysis:
 
         # Should stop after first api_error, not attempt item-2
         assert mock_classify.call_count == 1
+
+    @patch("worldlines.jobs.classify_item")
+    def test_analysis_cap_limits_items_processed(self, mock_classify, tmp_path):
+        """analysis_max_per_run caps how many items are classified in one run."""
+        config = _make_config(tmp_path, analysis_max_per_run=2)
+        init_db(config.database_path)
+
+        with get_connection(config.database_path) as conn:
+            for i in range(1, 5):
+                _seed_item(conn, f"item-{i}", f"Article {i}")
+
+        mock_classify.return_value = MagicMock(error=None)
+
+        run_analysis(config)
+
+        assert mock_classify.call_count == 2
+
+    @patch("worldlines.jobs.classify_item")
+    def test_short_content_items_are_skipped(self, mock_classify, tmp_path):
+        """Items with fewer than 50 words are skipped without an LLM call."""
+        config = _make_config(tmp_path)
+        init_db(config.database_path)
+
+        with get_connection(config.database_path) as conn:
+            _seed_item(conn, "item-short", "Short Article", content="Too short.")
+            _seed_item(conn, "item-long", "Long Article")
+
+        mock_classify.return_value = MagicMock(error=None)
+
+        run_analysis(config)
+
+        assert mock_classify.call_count == 1
+        call_item = mock_classify.call_args[0][0]
+        assert call_item.id == "item-long"
 
 
 def _seed_eligible_analysis(conn, analysis_id, item_id):

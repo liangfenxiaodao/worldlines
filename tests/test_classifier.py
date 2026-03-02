@@ -107,14 +107,15 @@ class TestParseJson:
 
 
 class TestCheckExposureEligibility:
-    def test_eligible_medium_importance_with_primary(self):
+    def test_ineligible_medium_importance_with_primary(self):
+        # Medium importance no longer meets the bar — only high qualifies.
         data = {
             "importance": "medium",
             "dimensions": [
                 {"dimension": "compute_and_computational_paradigms", "relevance": "primary"},
             ],
         }
-        assert check_exposure_eligibility(data) is True
+        assert check_exposure_eligibility(data) is False
 
     def test_eligible_high_importance_with_primary(self):
         data = {
@@ -349,9 +350,20 @@ class TestClassifyItem:
         assert result.analysis is not None
         assert result.error is None
 
-    @patch("worldlines.analysis.classifier._call_llm", side_effect=_mock_call_llm)
+    @patch("worldlines.analysis.classifier._call_llm")
     def test_eligible_for_exposure_mapping_set_true(self, mock_llm, db_path):
-        # VALID_LLM_RESPONSE has importance=medium + primary dimension → eligible
+        # Requires importance=high (medium no longer qualifies)
+        high_importance = json.dumps({
+            "dimensions": [
+                {"dimension": "compute_and_computational_paradigms", "relevance": "primary"},
+            ],
+            "change_type": "reinforcing",
+            "time_horizon": "medium_term",
+            "summary": "A high-importance observation about chip production.",
+            "importance": "high",
+            "key_entities": ["TSMC"],
+        })
+        mock_llm.return_value = high_importance
         result = classify_item(
             _make_item(),
             api_key="test-key",
@@ -383,8 +395,19 @@ class TestClassifyItem:
         )
         assert result.analysis["eligible_for_exposure_mapping"] is False
 
-    @patch("worldlines.analysis.classifier._call_llm", side_effect=_mock_call_llm)
+    @patch("worldlines.analysis.classifier._call_llm")
     def test_eligible_for_exposure_mapping_persisted(self, mock_llm, db_path):
+        high_importance = json.dumps({
+            "dimensions": [
+                {"dimension": "compute_and_computational_paradigms", "relevance": "primary"},
+            ],
+            "change_type": "reinforcing",
+            "time_horizon": "medium_term",
+            "summary": "A high-importance observation about chip production.",
+            "importance": "high",
+            "key_entities": ["TSMC"],
+        })
+        mock_llm.return_value = high_importance
         result = classify_item(
             _make_item(),
             api_key="test-key",

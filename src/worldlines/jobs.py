@@ -230,8 +230,9 @@ def run_analysis(config: Config) -> None:
                 "LEFT JOIN analysis_errors ae ON i.id = ae.item_id "
                 "WHERE a.id IS NULL "
                 "AND (ae.attempt_count IS NULL OR ae.attempt_count < ?) "
-                "ORDER BY i.ingested_at ASC",
-                (_MAX_CLASSIFICATION_ATTEMPTS,),
+                "ORDER BY i.ingested_at ASC "
+                "LIMIT ?",
+                (_MAX_CLASSIFICATION_ATTEMPTS, config.analysis_max_per_run),
             ).fetchall()
 
         items_found = len(rows)
@@ -239,9 +240,17 @@ def run_analysis(config: Config) -> None:
         if not rows:
             logger.info("Analysis: no unanalyzed items found")
         else:
-            logger.info("Analysis: found %d unanalyzed items", len(rows))
+            logger.info("Analysis: found %d unanalyzed items (cap: %d)", len(rows), config.analysis_max_per_run)
 
             for row in rows:
+                # Skip items with negligible content — not worth an LLM call.
+                word_count = len(row["content"].split())
+                if word_count < 50:
+                    logger.debug(
+                        "Skipping short item %s (%d words)", row["id"], word_count
+                    )
+                    continue
+
                 item = NormalizedItem(
                     id=row["id"],
                     title=row["title"],
@@ -290,7 +299,10 @@ def run_analysis(config: Config) -> None:
                     _record_analysis_error(config.database_path, item.id, "unexpected error")
                     logger.exception("Unexpected error classifying item %s", item.id)
 
-            logger.info("Analysis complete: %d analyzed, %d errors", analyzed, errors)
+            logger.info(
+                "Analysis complete: %d analyzed, %d errors (cap=%d)",
+                analyzed, errors, config.analysis_max_per_run,
+            )
     except Exception:
         logger.exception("Analysis failed")
         error_msg = "Analysis failed (see logs)"

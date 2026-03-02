@@ -24,10 +24,11 @@ logger = logging.getLogger(__name__)
 def check_exposure_eligibility(data: dict) -> bool:
     """Return True when an analysis meets the bar for exposure mapping.
 
-    Criteria: importance is medium or high AND at least one dimension
-    has relevance == "primary".
+    Criteria: importance is high AND at least one dimension has
+    relevance == "primary".  Medium-importance items are excluded to
+    reduce LLM spend on lower-value mapping calls.
     """
-    if data.get("importance") not in ("medium", "high"):
+    if data.get("importance") != "high":
         return False
     dims = data.get("dimensions")
     if not isinstance(dims, list):
@@ -161,7 +162,12 @@ def _call_llm(
     max_retries: int,
     timeout: int,
 ) -> str:
-    """Call the Anthropic API and return the text response."""
+    """Call the Anthropic API and return the text response.
+
+    The system prompt is sent with cache_control so repeated calls within
+    the cache TTL (~5 minutes) pay only 10% of the normal input token price
+    for the cached portion.
+    """
     client = anthropic.Anthropic(
         api_key=api_key,
         max_retries=max_retries,
@@ -171,8 +177,13 @@ def _call_llm(
         model=model,
         max_tokens=1024,
         temperature=temperature,
-        system=system_prompt,
+        system=[{
+            "type": "text",
+            "text": system_prompt,
+            "cache_control": {"type": "ephemeral"},
+        }],
         messages=[{"role": "user", "content": user_prompt}],
+        betas=["prompt-caching-2024-07-31"],
     )
     return message.content[0].text
 
