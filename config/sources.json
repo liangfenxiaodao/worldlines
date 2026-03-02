@@ -30,11 +30,6 @@
           "source_type": "government"
         },
         {
-          "url": "https://techcrunch.com/feed/",
-          "source_name": "TechCrunch",
-          "source_type": "news"
-        },
-        {
           "url": "https://www.technologyreview.com/feed/",
           "source_name": "MIT Technology Review",
           "source_type": "research"
@@ -70,16 +65,6 @@
           "source_type": "government"
         },
         {
-          "url": "https://www.sec.gov/enforcement-litigation/litigation-releases/rss",
-          "source_name": "SEC Litigation Releases",
-          "source_type": "government"
-        },
-        {
-          "url": "https://www.bls.gov/feed/bls_latest.rss",
-          "source_name": "BLS Latest Releases",
-          "source_type": "government"
-        },
-        {
           "url": "https://www.eia.gov/rss/press_rss.xml",
           "source_name": "EIA Press Releases",
           "source_type": "government"
@@ -95,28 +80,8 @@
           "source_type": "research"
         },
         {
-          "url": "https://www.reddit.com/r/technology/top.rss?t=day",
-          "source_name": "Reddit r/technology",
-          "source_type": "news"
-        },
-        {
           "url": "https://www.reddit.com/r/MachineLearning/top.rss?t=day",
           "source_name": "Reddit r/MachineLearning",
-          "source_type": "research"
-        },
-        {
-          "url": "https://www.reddit.com/r/programming/top.rss?t=day",
-          "source_name": "Reddit r/programming",
-          "source_type": "industry"
-        },
-        {
-          "url": "https://www.reddit.com/r/energy/top.rss?t=day",
-          "source_name": "Reddit r/energy",
-          "source_type": "industry"
-        },
-        {
-          "url": "https://www.reddit.com/r/economics/top.rss?t=day",
-          "source_name": "Reddit r/economics",
           "source_type": "research"
         }
       ]
