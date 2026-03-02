@@ -1,7 +1,7 @@
 import { NavLink, Outlet } from "react-router-dom";
 
 const links = [
-  { to: "/", label: "Dashboard" },
+  { to: "/", label: "Map" },
   { to: "/summaries", label: "Summaries" },
   { to: "/digests", label: "Digests" },
   { to: "/items", label: "Items" },

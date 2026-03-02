@@ -9,10 +9,14 @@ import sqlite3
 from fastapi import APIRouter, HTTPException, Query, Request
 from fastapi.responses import JSONResponse
 
+from worldlines.analysis.prompt import VALID_DIMENSIONS
 from worldlines.storage.connection import get_connection
 from worldlines.web.models import (
     DigestDetail,
     DigestListResponse,
+    DimensionCard,
+    DimensionDetail,
+    DimensionOverview,
     ExposureListResponse,
     ItemDetailResponse,
     ItemListResponse,
@@ -25,6 +29,8 @@ from worldlines.web.models import (
 )
 from worldlines.web.queries import (
     get_digest_by_date,
+    get_dimension_detail,
+    get_dimensions_overview,
     get_item_by_id,
     get_stats,
     get_ticker_exposures,
@@ -56,6 +62,23 @@ def health(request: Request) -> JSONResponse:
             {"status": "unhealthy", "database": "error", "detail": str(exc)},
             status_code=503,
         )
+
+
+@router.get("/dimensions", response_model=DimensionOverview)
+def list_dimensions(request: Request) -> DimensionOverview:
+    database_path = request.app.state.database_path
+    data = get_dimensions_overview(database_path)
+    cards = [DimensionCard(**d) for d in data]
+    return DimensionOverview(dimensions=cards)
+
+
+@router.get("/dimensions/{dimension}", response_model=DimensionDetail)
+def get_dimension(request: Request, dimension: str) -> DimensionDetail:
+    if dimension not in VALID_DIMENSIONS:
+        raise HTTPException(status_code=404, detail="Unknown dimension")
+    database_path = request.app.state.database_path
+    data = get_dimension_detail(database_path, dimension)
+    return DimensionDetail(**data)
 
 
 @router.get("/stats", response_model=StatsResponse)

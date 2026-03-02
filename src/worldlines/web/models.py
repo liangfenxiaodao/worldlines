@@ -219,6 +219,48 @@ class PeriodicSummaryListResponse(BaseModel):
 
 
 # ---------------------------------------------------------------------------
+# Dimensions
+# ---------------------------------------------------------------------------
+class DimensionSignal(BaseModel):
+    id: str
+    title: str
+    timestamp: str
+    change_type: str
+
+
+class DimensionCard(BaseModel):
+    dimension: str
+    item_count_30d: int
+    change_type_distribution: dict[str, int]
+    top_entities: list[str]
+    recent_items: list[DimensionSignal]
+
+
+class DimensionOverview(BaseModel):
+    dimensions: list[DimensionCard]
+
+
+class DimensionDetailItem(BaseModel):
+    id: str
+    title: str
+    summary: str
+    timestamp: str
+    change_type: str
+    importance: str
+    source_name: str
+
+
+class DimensionDetail(BaseModel):
+    dimension: str
+    item_count_7d: int
+    item_count_30d: int
+    item_count_90d: int
+    change_type_distribution: dict[str, int]
+    top_entities: list[str]
+    recent_items: list[DimensionDetailItem]
+
+
+# ---------------------------------------------------------------------------
 # Pipeline Runs
 # ---------------------------------------------------------------------------
 class PipelineRun(BaseModel):

@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 import json
+from datetime import datetime, timedelta, timezone
 
 from worldlines.web.deps import get_readonly_connection
 
@@ -613,3 +614,177 @@ def list_pipeline_runs(
         })
 
     return runs, total
+
+
+# ---------------------------------------------------------------------------
+# Dimensions overview
+# ---------------------------------------------------------------------------
+_DIMENSIONS_ORDERED = [
+    "compute_and_computational_paradigms",
+    "capital_flows_and_business_models",
+    "energy_resources_and_physical_constraints",
+    "technology_adoption_and_industrial_diffusion",
+    "governance_regulation_and_societal_response",
+]
+
+
+def get_dimensions_overview(database_path: str, days: int = 30) -> list[dict]:
+    """Return one summary dict per structural dimension for the given window."""
+    cutoff = (datetime.now(timezone.utc) - timedelta(days=days)).isoformat()
+
+    result = []
+    with get_readonly_connection(database_path) as conn:
+        for dim in _DIMENSIONS_ORDERED:
+            # item count
+            row = conn.execute(
+                "SELECT COUNT(DISTINCT i.id) AS cnt "
+                "FROM items i "
+                "JOIN analyses a ON a.item_id = i.id "
+                "JOIN json_each(a.dimensions) d "
+                "WHERE json_extract(d.value, '$.dimension') = ? "
+                "AND i.timestamp >= ?",
+                (dim, cutoff),
+            ).fetchone()
+            item_count = row["cnt"] if row else 0
+
+            # change_type distribution
+            ct_rows = conn.execute(
+                "SELECT a.change_type, COUNT(*) AS cnt "
+                "FROM analyses a "
+                "JOIN json_each(a.dimensions) d "
+                "WHERE json_extract(d.value, '$.dimension') = ? "
+                "AND a.analyzed_at >= ? "
+                "GROUP BY a.change_type",
+                (dim, cutoff),
+            ).fetchall()
+            ct_dist = {r["change_type"]: r["cnt"] for r in ct_rows}
+
+            # top entities
+            ent_rows = conn.execute(
+                "SELECT ent.value AS entity, COUNT(*) AS cnt "
+                "FROM analyses a "
+                "JOIN json_each(a.dimensions) d "
+                "JOIN json_each(a.key_entities) ent "
+                "WHERE json_extract(d.value, '$.dimension') = ? "
+                "AND a.analyzed_at >= ? "
+                "GROUP BY ent.value "
+                "ORDER BY cnt DESC LIMIT 5",
+                (dim, cutoff),
+            ).fetchall()
+            top_entities = [r["entity"] for r in ent_rows]
+
+            # recent high/medium importance items
+            item_rows = conn.execute(
+                "SELECT i.id, i.title, i.timestamp, a.change_type "
+                "FROM items i "
+                "JOIN analyses a ON a.item_id = i.id "
+                "JOIN json_each(a.dimensions) d "
+                "WHERE json_extract(d.value, '$.dimension') = ? "
+                "AND a.importance IN ('high', 'medium') "
+                "AND i.timestamp >= ? "
+                "ORDER BY i.timestamp DESC LIMIT 3",
+                (dim, cutoff),
+            ).fetchall()
+            recent_items = [
+                {
+                    "id": r["id"],
+                    "title": r["title"],
+                    "timestamp": r["timestamp"],
+                    "change_type": r["change_type"],
+                }
+                for r in item_rows
+            ]
+
+            result.append({
+                "dimension": dim,
+                "item_count_30d": item_count,
+                "change_type_distribution": ct_dist,
+                "top_entities": top_entities,
+                "recent_items": recent_items,
+            })
+
+    return result
+
+
+# ---------------------------------------------------------------------------
+# Dimension detail
+# ---------------------------------------------------------------------------
+def get_dimension_detail(database_path: str, dimension: str) -> dict:
+    """Return detailed stats for a single structural dimension."""
+    now = datetime.now(timezone.utc)
+    cutoff_7d = (now - timedelta(days=7)).isoformat()
+    cutoff_30d = (now - timedelta(days=30)).isoformat()
+    cutoff_90d = (now - timedelta(days=90)).isoformat()
+
+    with get_readonly_connection(database_path) as conn:
+        def _count(cutoff: str) -> int:
+            row = conn.execute(
+                "SELECT COUNT(DISTINCT i.id) AS cnt "
+                "FROM items i "
+                "JOIN analyses a ON a.item_id = i.id "
+                "JOIN json_each(a.dimensions) d "
+                "WHERE json_extract(d.value, '$.dimension') = ? "
+                "AND i.timestamp >= ?",
+                (dimension, cutoff),
+            ).fetchone()
+            return row["cnt"] if row else 0
+
+        count_7d = _count(cutoff_7d)
+        count_30d = _count(cutoff_30d)
+        count_90d = _count(cutoff_90d)
+
+        ct_rows = conn.execute(
+            "SELECT a.change_type, COUNT(*) AS cnt "
+            "FROM analyses a "
+            "JOIN json_each(a.dimensions) d "
+            "WHERE json_extract(d.value, '$.dimension') = ? "
+            "GROUP BY a.change_type",
+            (dimension,),
+        ).fetchall()
+        ct_dist = {r["change_type"]: r["cnt"] for r in ct_rows}
+
+        ent_rows = conn.execute(
+            "SELECT ent.value AS entity, COUNT(*) AS cnt "
+            "FROM analyses a "
+            "JOIN json_each(a.dimensions) d "
+            "JOIN json_each(a.key_entities) ent "
+            "WHERE json_extract(d.value, '$.dimension') = ? "
+            "GROUP BY ent.value "
+            "ORDER BY cnt DESC LIMIT 8",
+            (dimension,),
+        ).fetchall()
+        top_entities = [r["entity"] for r in ent_rows]
+
+        item_rows = conn.execute(
+            "SELECT i.id, i.title, i.source_name, i.timestamp, "
+            "a.change_type, a.importance, a.summary "
+            "FROM items i "
+            "JOIN analyses a ON a.item_id = i.id "
+            "JOIN json_each(a.dimensions) d "
+            "WHERE json_extract(d.value, '$.dimension') = ? "
+            "AND a.importance IN ('high', 'medium') "
+            "ORDER BY i.timestamp DESC LIMIT 10",
+            (dimension,),
+        ).fetchall()
+        recent_items = [
+            {
+                "id": r["id"],
+                "title": r["title"],
+                "summary": r["summary"],
+                "timestamp": r["timestamp"],
+                "change_type": r["change_type"],
+                "importance": r["importance"],
+                "source_name": r["source_name"],
+            }
+            for r in item_rows
+        ]
+
+    return {
+        "dimension": dimension,
+        "item_count_7d": count_7d,
+        "item_count_30d": count_30d,
+        "item_count_90d": count_90d,
+        "change_type_distribution": ct_dist,
+        "top_entities": top_entities,
+        "recent_items": recent_items,
+    }

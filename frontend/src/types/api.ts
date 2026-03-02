@@ -237,6 +237,45 @@ export interface RunsParams {
   per_page?: number;
 }
 
+export interface DimensionSignal {
+  id: string;
+  title: string;
+  timestamp: string;
+  change_type: string;
+}
+
+export interface DimensionCard {
+  dimension: string;
+  item_count_30d: number;
+  change_type_distribution: Record<string, number>;
+  top_entities: string[];
+  recent_items: DimensionSignal[];
+}
+
+export interface DimensionOverview {
+  dimensions: DimensionCard[];
+}
+
+export interface DimensionDetailItem {
+  id: string;
+  title: string;
+  summary: string;
+  timestamp: string;
+  change_type: string;
+  importance: string;
+  source_name: string;
+}
+
+export interface DimensionDetail {
+  dimension: string;
+  item_count_7d: number;
+  item_count_30d: number;
+  item_count_90d: number;
+  change_type_distribution: Record<string, number>;
+  top_entities: string[];
+  recent_items: DimensionDetailItem[];
+}
+
 export interface ItemsParams {
   dimension?: string;
   change_type?: string;

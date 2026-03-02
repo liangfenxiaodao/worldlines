@@ -1,6 +1,7 @@
 import { Routes, Route } from "react-router-dom";
 import Layout from "./components/Layout";
-import Dashboard from "./pages/Dashboard";
+import Map from "./pages/Map";
+import DimensionDetailPage from "./pages/DimensionDetail";
 import DigestList from "./pages/DigestList";
 import DigestDetail from "./pages/DigestDetail";
 import ItemList from "./pages/ItemList";
@@ -15,7 +16,8 @@ export default function App() {
   return (
     <Routes>
       <Route element={<Layout />}>
-        <Route index element={<Dashboard />} />
+        <Route index element={<Map />} />
+        <Route path="dimensions/:dimension" element={<DimensionDetailPage />} />
         <Route path="summaries" element={<SummaryList />} />
         <Route path="digests" element={<DigestList />} />
         <Route path="digests/:date" element={<DigestDetail />} />

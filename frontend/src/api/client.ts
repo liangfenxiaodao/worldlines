@@ -1,6 +1,8 @@
 import type {
   DigestDetail,
   DigestListResponse,
+  DimensionDetail,
+  DimensionOverview,
   ExposureListResponse,
   ExposuresParams,
   ItemDetailResponse,
@@ -92,6 +94,14 @@ export function fetchSummaries(
   return request<PeriodicSummaryListResponse>(
     `/summaries?page=${page}&per_page=${perPage}`,
   );
+}
+
+export function fetchDimensions(): Promise<DimensionOverview> {
+  return request<DimensionOverview>("/dimensions");
+}
+
+export function fetchDimensionDetail(dimension: string): Promise<DimensionDetail> {
+  return request<DimensionDetail>(`/dimensions/${encodeURIComponent(dimension)}`);
 }
 
 export function fetchRuns(params: RunsParams = {}): Promise<PipelineRunListResponse> {
