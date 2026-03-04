@@ -52,11 +52,6 @@ class Config:
     periodic_summary_schedule_cron: str = "0 10 * * 1"  # Monday 10:00 UTC
     periodic_summary_window_days: int = 7
 
-    # Optional — Backup
-    backup_dir: str = "/data/backups"
-    backup_retention_days: int = 7
-    backup_schedule_cron: str = "0 3 * * *"
-
     # Optional — Application
     log_level: str = "INFO"
     log_format: str = "json"
@@ -131,10 +126,6 @@ def load_config(env_path: str | Path | None = None) -> Config:
         periodic_summary_window_days=int(
             os.environ.get("PERIODIC_SUMMARY_WINDOW_DAYS", "7")
         ),
-        # Optional — Backup
-        backup_dir=os.environ.get("BACKUP_DIR", "/data/backups"),
-        backup_retention_days=int(os.environ.get("BACKUP_RETENTION_DAYS", "7")),
-        backup_schedule_cron=os.environ.get("BACKUP_SCHEDULE_CRON", "0 3 * * *"),
         # Optional — Application
         log_level=os.environ.get("LOG_LEVEL", "INFO"),
         log_format=os.environ.get("LOG_FORMAT", "json"),
