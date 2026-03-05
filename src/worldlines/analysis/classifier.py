@@ -183,7 +183,6 @@ def _call_llm(
             "cache_control": {"type": "ephemeral"},
         }],
         messages=[{"role": "user", "content": user_prompt}],
-        betas=["prompt-caching-2024-07-31"],
     )
     return message.content[0].text
 
