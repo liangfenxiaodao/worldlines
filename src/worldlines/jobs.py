@@ -242,8 +242,10 @@ def run_analysis(config: Config) -> None:
 
             for row in rows:
                 # Skip items with negligible content — not worth an LLM call.
-                word_count = len(row["content"].split())
-                if word_count < 50:
+                # Count title + content together since content is often a short
+                # synthetic string (e.g. HN: "title | N points, M comments").
+                word_count = len((row["title"] + " " + row["content"]).split())
+                if word_count < 10:
                     logger.debug(
                         "Skipping short item %s (%d words)", row["id"], word_count
                     )
